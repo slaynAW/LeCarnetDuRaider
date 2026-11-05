@@ -5,6 +5,10 @@ Chaque section « ## X.Y.Z » est affichée dans l'application au moment de prop
 avant de publier une version (docs/MISES-A-JOUR.md). Les noms du jeu cités ici suivent la même règle
 que l'application : uniquement les traductions françaises officielles d'Embark Studios.
 
+## 0.14.6
+
+- **Accueil plus léger** : sous ton prochain raid (la carte et sa meilleure zone), une seule carte avec une ligne par section et son chiffre à droite. Les objets à garder et le plus demandé ; la condition de la carte en cours, sa carte et ce qu'il lui reste ; tes objectifs en cours ; ton build préféré, ses matériaux et ses cases remplies. Chaque ligne mène à son onglet.
+
 ## 0.14.5
 
 - **Ton prochain raid** : sur toute la largeur de l'écran, avec les bandes du logo en pied. La capture de la carte bouge lentement, comme filmée à l'épaule, avec de rares petits glitchs.

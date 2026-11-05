@@ -2,39 +2,40 @@ package io.github.slaynaw.carnetduraider.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.slaynaw.carnetduraider.CarnetViewModel
@@ -43,15 +44,14 @@ import io.github.slaynaw.carnetduraider.core.Catalogue
 import io.github.slaynaw.carnetduraider.core.Objectif
 import io.github.slaynaw.carnetduraider.core.Verdict
 import io.github.slaynaw.carnetduraider.core.calendrier.Calendrier
-import io.github.slaynaw.carnetduraider.core.calendrier.Creneau
 import io.github.slaynaw.carnetduraider.ui.theme.Prompt
 import io.github.slaynaw.carnetduraider.ui.theme.Signal
 import java.time.LocalTime
 
 /**
- * Accueil : les cinq sections d'un coup d'œil, sans faire défiler. En tête, le prochain raid (la carte, ses
- * deux meilleures zones), puis la frise des conditions de la carte (en cours et à venir), et trois tuiles :
- * objets à garder, objectifs en cours, build préféré. Chaque bloc mène à son onglet.
+ * Accueil : les cinq sections d'un coup d'œil, sans faire défiler. En tête, le prochain raid (la carte, sa
+ * meilleure zone), puis la liste de bord : une ligne par section (objets à garder, condition de la carte en
+ * cours, objectifs en cours, build préféré), son chiffre à droite. Chaque bloc mène à son onglet.
  */
 @Composable
 fun EcranAccueil(
@@ -85,16 +85,17 @@ fun EcranAccueil(
 
                     ProchainRaid(vm, aller)
 
-                    // Quatre tuiles, deux par ligne et de même hauteur : objets, cartes, objectifs, build.
-                    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        val tuile = Modifier.weight(1f).fillMaxHeight()
-                        TuileObjets(vm, tuile, onClick = { aller(Onglet.OBJETS) })
-                        TuileCartes(vm, calendrier, tuile, onClick = { aller(Onglet.CARTES) })
-                    }
-                    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        val tuile = Modifier.weight(1f).fillMaxHeight()
-                        TuileObjectifs(vm, tuile, onClick = { aller(Onglet.OBJECTIFS) })
-                        TuileBuild(vm, tuile, onClick = { aller(Onglet.BUILDS) })
+                    // Une seule carte, une ligne par section : objets, cartes, objectifs, build.
+                    Surface(color = Signal.Surface, shape = RoundedCornerShape(6.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                        Column {
+                            LigneObjets(vm, onClick = { aller(Onglet.OBJETS) })
+                            HorizontalDivider(color = Signal.Releve)
+                            LigneCartes(vm, calendrier, onClick = { aller(Onglet.CARTES) })
+                            HorizontalDivider(color = Signal.Releve)
+                            LigneObjectifs(vm, onClick = { aller(Onglet.OBJECTIFS) })
+                            HorizontalDivider(color = Signal.Releve)
+                            LigneBuild(vm, onClick = { aller(Onglet.BUILDS) })
+                        }
                     }
 
                     Text(
@@ -110,8 +111,8 @@ fun EcranAccueil(
 }
 
 /**
- * Où aller au prochain raid pour trouver ce qui manque : la carte, combien d'objets on y trouve (et combien
- * tombent des ARC), puis ses deux meilleures zones avec leur nombre d'objets bien en vue.
+ * Où aller au prochain raid pour trouver ce qui manque : la carte, combien d'objets on y trouve, puis sa
+ * meilleure zone avec son nombre d'objets bien en vue.
  */
 @Composable
 private fun ProchainRaid(vm: CarnetViewModel, aller: (Onglet) -> Unit) {
@@ -139,23 +140,16 @@ private fun ProchainRaid(vm: CarnetViewModel, aller: (Onglet) -> Unit) {
                 when {
                     premiere != null -> {
                         Text("Va sur ${vm.catalogue.carte(premiere.carteId)?.nom ?: Catalogue.NOM_A_VERIFIER}", style = MaterialTheme.typography.headlineSmall)
-                        val surLesArc = restants.count { "ARC" in (vm.catalogue.objet(it.objetId)?.lieux ?: emptyList()) }
                         Text(
-                            buildString {
-                                append("${premiere.objets.size} de tes ${pluriel(restants.size, "objet", "objets")} à trouver")
-                                if (surLesArc > 0) append(" · $surLesArc sur les ARC détruits")
-                            },
+                            "${premiere.objets.size} de tes ${pluriel(restants.size, "objet", "objets")} à trouver",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
                         )
-                        val zones = premiere.zones.take(2)
-                        if (zones.isNotEmpty()) {
-                            Box(Modifier.padding(top = 6.dp).fillMaxWidth().height(1.dp).background(LocalContentColor.current.copy(alpha = 0.16f)))
-                            zones.forEach { z ->
-                                Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    Text(z.zone, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                                    PastilleNombre(pluriel(z.objets.size, "objet", "objets"), surRouge)
-                                }
+                        val zone = premiere.zones.firstOrNull()
+                        if (zone != null) {
+                            Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text(zone.zone, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                                PastilleNombre(pluriel(zone.objets.size, "objet", "objets"), surRouge)
                             }
                         }
                     }
@@ -205,207 +199,121 @@ private fun PastilleNombre(texte: String, surRouge: Boolean) {
     )
 }
 
-/** Ce qui est à garder (objectifs et builds), l'objet le plus demandé encore à trouver et ceux qui tombent des ARC. */
+/** Ce qui est à garder (objectifs et builds), avec l'objet le plus demandé encore à trouver. */
 @Composable
-private fun TuileObjets(vm: CarnetViewModel, modifier: Modifier, onClick: () -> Unit) {
+private fun LigneObjets(vm: CarnetViewModel, onClick: () -> Unit) {
     val restants = vm.aTrouver().filter { !it.trouve }.sortedByDescending { it.reste }
     val aGarder = remember(restants, vm.builds) { vm.catalogue.tous.count { vm.verdict(it.id) !is Verdict.Inutile } }
-    val surLesArc = restants.count { "ARC" in (vm.catalogue.objet(it.objetId)?.lieux ?: emptyList()) }
-    TuileSection(Onglet.OBJETS, modifier, onClick) {
-        Chiffre("$aGarder", "à garder")
-        val premier = restants.firstOrNull()
-        if (premier == null) {
-            Text("Garder, recycler ou vendre ?", style = MaterialTheme.typography.bodySmall, color = Signal.TexteDoux, modifier = Modifier.padding(top = 10.dp))
-        } else {
-            SousTitre("Le plus demandé")
-            Row(Modifier.padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                IconeObjet(premier.objetId, vm.catalogue.objet(premier.objetId)?.rarete, 24.dp)
-                Text(vm.catalogue.nomObjet(premier.objetId), style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                Text("×${premier.reste}", style = TextStyle(fontFamily = Prompt, fontWeight = FontWeight.Bold, fontSize = 13.sp), color = Signal.Or)
-            }
-            if (surLesArc > 0) LignePuce("${pluriel(surLesArc, "objet", "objets")} sur les ARC détruits", Signal.Or)
-        }
-    }
-}
-
-/**
- * Les conditions de la carte : celle en cours (et ce qu'il lui reste, en barre), puis la suivante, avec une
- * cloche si elle a une alerte. Avant la lecture du calendrier officiel, la tuile le dit.
- */
-@Composable
-private fun TuileCartes(vm: CarnetViewModel, calendrier: Calendrier?, modifier: Modifier, onClick: () -> Unit) {
-    val t = maintenant(30_000)
-    val reglages by vm.alertes.reglages.collectAsState()
-    TuileSection(Onglet.CARTES, modifier, onClick) {
-        if (calendrier == null) {
-            Text("Conditions de la carte : lecture du calendrier officiel…", style = MaterialTheme.typography.bodySmall, color = Signal.TexteDoux, modifier = Modifier.padding(top = 10.dp))
-            return@TuileSection
-        }
-        val enCours = calendrier.enCours(vm.region, t).firstOrNull()
-        val suivante = calendrier.aVenir(vm.region, t, 6 * Calendrier.UNE_HEURE).firstOrNull()
-        if (enCours == null && suivante == null) {
-            Text("Rien d'annoncé dans les prochaines heures.", style = MaterialTheme.typography.bodySmall, color = Signal.TexteDoux, modifier = Modifier.padding(top = 10.dp))
-            return@TuileSection
-        }
-        if (enCours != null) {
-            SousTitre("Maintenant")
-            LigneCondition(enCours, "encore ${duree(enCours.fin - t)}", suivie = enCours.conditionId in reglages.conditions)
-            Barre(((t - enCours.debut).toFloat() / (enCours.fin - enCours.debut).coerceAtLeast(1)), Signal.Cyan, Modifier.padding(top = 6.dp), epaisseur = 3.dp)
-        }
-        if (suivante != null) {
-            SousTitre("Ensuite")
-            LigneCondition(suivante, "dans ${duree(suivante.debut - t)}", suivie = suivante.conditionId in reglages.conditions)
-        }
-    }
-}
-
-@Composable
-private fun LigneCondition(c: Creneau, quand: String, suivie: Boolean) {
-    Row(Modifier.padding(top = 3.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            c.condition,
-            style = MaterialTheme.typography.titleSmall.copy(fontSize = 13.sp, lineHeight = 16.sp),
-            color = if (c.majeure) Signal.Rouge else Signal.Texte,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = false),
-        )
-        if (suivie) Icon(Icons.Filled.Notifications, contentDescription = "Alerte", tint = Signal.Cyan, modifier = Modifier.size(12.dp))
-    }
-    Text("${c.carte} · $quand", style = MaterialTheme.typography.bodySmall, color = Signal.TexteDoux, maxLines = 1, overflow = TextOverflow.Ellipsis)
-}
-
-/** Les objectifs en cours par sorte (quêtes, ateliers, projets, expéditions), et celui qui est le plus près d'être fini. */
-@Composable
-private fun TuileObjectifs(vm: CarnetViewModel, modifier: Modifier, onClick: () -> Unit) {
-    val objectifs = vm.objectifs
-    val liste = vm.listeDeCourses()
-    TuileSection(Onglet.OBJECTIFS, modifier, onClick) {
-        Chiffre("${objectifs.size}", "en cours")
-        if (objectifs.isEmpty()) {
-            Text("Touche pour indiquer tes quêtes, ateliers, projets ou expéditions", style = MaterialTheme.typography.bodySmall, color = Signal.TexteDoux, modifier = Modifier.padding(top = 10.dp))
-            return@TuileSection
-        }
-        val quetes = objectifs.count { it is Objectif.QueteATerminer }
-        val ateliers = objectifs.count { it is Objectif.NiveauDEtabli }
-        val projets = objectifs.filterIsInstance<Objectif.EtapeDeProjet>()
-        val expeditions = projets.count { vm.catalogue.projet(it.projetId)?.expedition == true }
-        Text(
-            listOfNotNull(
-                quetes.takeIf { it > 0 }?.let { pluriel(it, "quête", "quêtes") },
-                ateliers.takeIf { it > 0 }?.let { pluriel(it, "atelier", "ateliers") },
-                (projets.size - expeditions).takeIf { it > 0 }?.let { pluriel(it, "projet", "projets") },
-                expeditions.takeIf { it > 0 }?.let { pluriel(it, "expédition", "expéditions") },
-            ).joinToString(" · "),
-            style = MaterialTheme.typography.bodySmall,
-            color = Signal.TexteDoux,
-            modifier = Modifier.padding(top = 3.dp),
-        )
-        // Le plus près d'être fini : la plus grande part des objets demandés déjà rapportés.
-        val proche = liste.lignes.flatMap { it.pour }.groupBy { it.libelle }
-            .map { (libelle, besoins) -> Triple(libelle, besoins.sumOf { minOf(it.apporte, it.quantite) }, besoins.sumOf { it.quantite }) }
-            .filter { it.third > 0 && it.second < it.third }
-            // À égalité, celui à qui il manque le moins d'objets.
-            .sortedWith(compareByDescending<Triple<String, Int, Int>> { it.second.toDouble() / it.third }.thenBy { it.third - it.second })
-            .firstOrNull()
-        if (proche != null) {
-            SousTitre("Le plus proche")
-            Text(proche.first, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
-            Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Barre(proche.second.toFloat() / proche.third, Signal.Vert, Modifier.weight(1f), epaisseur = 3.dp)
-                Text("${proche.second}/${proche.third}", style = MaterialTheme.typography.bodySmall, color = Signal.TexteDoux)
-            }
-        }
-    }
-}
-
-/** Le build préféré (sinon le premier rempli) : son nom, ses cases remplies et les matériaux pour le fabriquer. */
-@Composable
-private fun TuileBuild(vm: CarnetViewModel, modifier: Modifier, onClick: () -> Unit) {
-    val rang = vm.builds.indexOfFirst { it.prefere && !it.vide }.takeIf { it >= 0 } ?: vm.builds.indexOfFirst { !it.vide }
-    val build = vm.builds.getOrNull(rang)
-    TuileSection(Onglet.BUILDS, modifier, onClick) {
-        if (build == null) {
-            Text("Aucun build", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 10.dp))
-            Text("Touche pour préparer ton équipement : ses objets passent en « Garder ».", style = MaterialTheme.typography.bodySmall, color = Signal.TexteDoux, modifier = Modifier.padding(top = 4.dp))
-            return@TuileSection
-        }
-        Text(
-            vm.outilsBuilds.nom(build, rang) + if (build.prefere) " ★" else "",
-            style = MaterialTheme.typography.titleMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 10.dp),
-        )
-        Text("${build.objets.size} cases sur ${CaseBuild.entries.size}", style = MaterialTheme.typography.bodySmall, color = Signal.TexteDoux)
-        val materiaux = remember(build) { vm.outilsBuilds.aFabriquer(build) }
-        if (materiaux.isNotEmpty()) {
-            SousTitre("Pour le fabriquer")
-            Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                materiaux.take(3).forEach { (id, _) -> IconeObjet(id, vm.catalogue.objet(id)?.rarete, 24.dp) }
-            }
-            Text("${pluriel(materiaux.size, "matériau", "matériaux")} à garder", style = MaterialTheme.typography.bodySmall, color = Signal.TexteDoux, modifier = Modifier.padding(top = 5.dp))
-        }
-    }
-}
-
-/** Petit titre en capitales discrètes à l'intérieur d'une tuile (« LE PLUS DEMANDÉ », « ENSUITE »…). */
-@Composable
-private fun SousTitre(texte: String) {
-    PetiteEtiquette(texte, Signal.TexteDiscret, Modifier.padding(top = 10.dp))
-}
-
-/** Une ligne précédée d'un petit carré de la couleur de la section. */
-@Composable
-private fun LignePuce(texte: String, couleur: Color) {
-    Row(Modifier.padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Box(Modifier.size(4.dp).background(couleur, RoundedCornerShape(1.dp)))
-        Text(texte, style = MaterialTheme.typography.bodySmall, maxLines = 2)
-    }
-}
-
-/** Une tuile de l'accueil : fin trait de la couleur de la section en haut, son icône et son nom en capitales. */
-@Composable
-private fun TuileSection(
-    onglet: Onglet,
-    modifier: Modifier,
-    onClick: () -> Unit,
-    droite: @Composable () -> Unit = {},
-    contenu: @Composable ColumnScope.() -> Unit,
-) {
-    Surface(onClick = onClick, color = Signal.Surface, shape = RoundedCornerShape(6.dp), modifier = modifier) {
-        Box {
-            Box(Modifier.fillMaxWidth().height(2.dp).background(onglet.couleur))
-            Column(Modifier.fillMaxHeight().padding(horizontal = 10.dp, vertical = 12.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Icon(onglet.icone, contentDescription = null, tint = onglet.couleur, modifier = Modifier.size(14.dp))
-                    PetiteEtiquette(onglet.titre, onglet.couleur, Modifier.weight(1f))
-                    droite()
-                }
-                contenu()
-            }
-        }
-    }
-}
-
-/** Étiquette en capitales plus petite que [Etiquette], pour les tuiles étroites. */
-@Composable
-private fun PetiteEtiquette(texte: String, couleur: Color, modifier: Modifier = Modifier) {
-    Text(
-        texte.uppercase(),
-        style = TextStyle(fontFamily = Prompt, fontWeight = FontWeight.Bold, fontSize = 9.5.sp, lineHeight = 12.sp, letterSpacing = 1.1.sp),
-        color = couleur,
-        maxLines = 1,
-        modifier = modifier,
+    val premier = restants.firstOrNull()
+    LigneDeBord(
+        Onglet.OBJETS,
+        titre = "Objets à garder",
+        detail = if (premier != null) "Le plus demandé : ${vm.catalogue.nomObjet(premier.objetId)}" else "Garder, recycler ou vendre ?",
+        chiffre = "$aGarder",
+        onClick = onClick,
     )
 }
 
-/** Un grand chiffre et son unité (« 7 à garder »). */
+/**
+ * La condition de la carte en cours, sa carte et ce qu'il lui reste ; sinon la prochaine des six heures à venir.
+ * Avant la lecture du calendrier officiel, la ligne le dit.
+ */
 @Composable
-private fun Chiffre(nombre: String, unite: String) {
-    Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(nombre, style = TextStyle(fontFamily = Prompt, fontWeight = FontWeight.Bold, fontSize = 24.sp, lineHeight = 26.sp), modifier = Modifier.alignByBaseline())
-        Text(unite, style = MaterialTheme.typography.bodySmall, color = Signal.TexteDoux, modifier = Modifier.alignByBaseline())
+private fun LigneCartes(vm: CarnetViewModel, calendrier: Calendrier?, onClick: () -> Unit) {
+    val t = maintenant(30_000)
+    val enCours = calendrier?.enCours(vm.region, t)?.firstOrNull()
+    val suivante = if (calendrier != null && enCours == null) calendrier.aVenir(vm.region, t, 6 * Calendrier.UNE_HEURE).firstOrNull() else null
+    when {
+        calendrier == null -> LigneDeBord(Onglet.CARTES, "Conditions de la carte", "Lecture du calendrier officiel…", onClick = onClick)
+        enCours != null -> LigneDeBord(Onglet.CARTES, enCours.condition, enCours.carte, chiffre = duree(enCours.fin - t), onClick = onClick)
+        suivante != null -> LigneDeBord(Onglet.CARTES, suivante.condition, "${suivante.carte} · dans ${duree(suivante.debut - t)}", onClick = onClick)
+        else -> LigneDeBord(Onglet.CARTES, "Conditions de la carte", "Rien d'annoncé dans les prochaines heures.", onClick = onClick)
+    }
+}
+
+/** Les objectifs en cours, par sorte (quêtes, ateliers, projets, expéditions). */
+@Composable
+private fun LigneObjectifs(vm: CarnetViewModel, onClick: () -> Unit) {
+    val objectifs = vm.objectifs
+    val quetes = objectifs.count { it is Objectif.QueteATerminer }
+    val ateliers = objectifs.count { it is Objectif.NiveauDEtabli }
+    val projets = objectifs.filterIsInstance<Objectif.EtapeDeProjet>()
+    val expeditions = projets.count { vm.catalogue.projet(it.projetId)?.expedition == true }
+    val sortes = listOfNotNull(
+        quetes.takeIf { it > 0 }?.let { pluriel(it, "quête", "quêtes") },
+        ateliers.takeIf { it > 0 }?.let { pluriel(it, "atelier", "ateliers") },
+        (projets.size - expeditions).takeIf { it > 0 }?.let { pluriel(it, "projet", "projets") },
+        expeditions.takeIf { it > 0 }?.let { pluriel(it, "expédition", "expéditions") },
+    ).joinToString(" · ")
+    LigneDeBord(
+        Onglet.OBJECTIFS,
+        titre = "Objectifs en cours",
+        detail = sortes.ifEmpty { "Touche pour indiquer tes quêtes, ateliers, projets ou expéditions" },
+        chiffre = "${objectifs.size}",
+        onClick = onClick,
+    )
+}
+
+/** Le build préféré (sinon le premier rempli) : les matériaux pour le fabriquer et ses cases remplies. */
+@Composable
+private fun LigneBuild(vm: CarnetViewModel, onClick: () -> Unit) {
+    val rang = vm.builds.indexOfFirst { it.prefere && !it.vide }.takeIf { it >= 0 } ?: vm.builds.indexOfFirst { !it.vide }
+    val build = vm.builds.getOrNull(rang)
+    if (build == null) {
+        LigneDeBord(Onglet.BUILDS, "Aucun build", "Touche pour préparer ton équipement", onClick = onClick)
+        return
+    }
+    val materiaux = remember(build) { vm.outilsBuilds.aFabriquer(build) }
+    LigneDeBord(
+        Onglet.BUILDS,
+        titre = vm.outilsBuilds.nom(build, rang),
+        etoile = build.prefere,
+        detail = if (materiaux.isEmpty()) "Rien à fabriquer" else "${pluriel(materiaux.size, "matériau", "matériaux")} à garder",
+        chiffre = "${build.objets.size}/${CaseBuild.entries.size}",
+        onClick = onClick,
+    )
+}
+
+/**
+ * Une ligne de la liste de bord : l'icône de la section sur une pastille de sa couleur, un titre et sa précision,
+ * puis le chiffre à retenir à droite (rien quand il n'y en a pas).
+ */
+@Composable
+private fun LigneDeBord(
+    onglet: Onglet,
+    titre: String,
+    detail: String,
+    chiffre: String? = null,
+    etoile: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(role = Role.Button, onClick = onClick)
+            .heightIn(min = 72.dp)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(Modifier.size(34.dp).background(onglet.couleur.copy(alpha = 0.12f), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+            Icon(onglet.icone, contentDescription = null, tint = onglet.couleur, modifier = Modifier.size(18.dp))
+        }
+        Column(Modifier.weight(1f)) {
+            Text(
+                buildAnnotatedString {
+                    append(titre)
+                    if (etoile) withStyle(SpanStyle(color = Signal.Violet)) { append(" ★") }
+                },
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = Signal.TexteDoux, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+        if (chiffre != null) {
+            Text(chiffre, style = TextStyle(fontFamily = Prompt, fontWeight = FontWeight.Bold, fontSize = 19.sp, lineHeight = 22.sp), maxLines = 1)
+        }
     }
 }
 

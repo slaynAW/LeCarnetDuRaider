@@ -136,11 +136,12 @@ guillemets `« … »`. Apostrophe droite `'` acceptée dans le code.
   qu'il faut trouver (`Planificateur.aTrouver`) = ce qui manque aux objectifs en cours ; cartes classées
   par la somme des indices de butin des objets encore à trouver (chaque objet compte au plus 1 par
   carte), zones où chercher, et parcours de 1 à 3 cartes pour tout trouver. L'accueil (`EcranAccueil`) montre les cinq
-  sections sans défiler : le prochain raid sur toute la largeur (meilleure carte, objets sur les ARC, ses deux meilleures zones avec
-  leur nombre d'objets en pastille ; capture qui bouge lentement « à l'épaule » avec deux glitchs très brefs par
-  boucle de 16 s, `FondEnJeuAnime`, immobile avec « Supprimer les animations » ; bandes du logo en pied), puis quatre tuiles deux par deux (`TuileSection`) : objets à garder, le plus
-  demandé et ceux qui tombent des ARC ; conditions de la carte (en cours avec sa barre, puis la suivante et sa
-  cloche) ; objectifs par sorte et le plus proche d'être fini ; build préféré, ses cases et ses matériaux. En tête du Raid, la meilleure carte (« Où chercher » déplie ses zones et la carte
+  sections sans défiler : le prochain raid sur toute la largeur (meilleure carte, objets à trouver, sa meilleure zone et
+  son nombre d'objets en pastille ; capture qui bouge lentement « à l'épaule » avec deux glitchs très brefs par
+  boucle de 16 s, `FondEnJeuAnime`, immobile avec « Supprimer les animations » ; bandes du logo en pied), puis la liste de bord, une seule carte à une ligne par section (`LigneDeBord` : icône sur une pastille de la
+  couleur de la section, titre, précision, chiffre à droite) : objets à garder et le plus demandé ; condition de la carte
+  en cours, sa carte et ce qu'il lui reste (sinon la prochaine) ; objectifs en cours par sorte ; build préféré, ses
+  matériaux et ses cases remplies. En tête du Raid, la meilleure carte (« Où chercher » déplie ses zones et la carte
   suivante du parcours), puis ce qu'il te faut en liste compacte ; « Mes objectifs » et « Où aller »
   repliés ; « Retour de raid » en bas à droite (`BoutonRetourRaid`) : petite pastille en verre rouge
   opaque à 84 %, la liste passe dessous en filigrane ; en boucle, lentement, les bandes du logo s'allument puis
