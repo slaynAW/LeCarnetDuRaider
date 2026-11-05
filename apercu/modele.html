@@ -95,29 +95,23 @@ button.carte:hover { background: var(--releve); }
 .prochain.plein { border-radius: 0; clip-path: var(--coupee); }
 .prochain.plein { background: var(--rouge); color: var(--sur-couleur); }
 .prochain:hover { filter: brightness(1.08); }
-/* Les deux meilleures zones du prochain raid, nombre d'objets en pastille (PastilleNombre, EcranAccueil.kt). */
-.zones-raid { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(243,238,228,.16); }
-.zones-raid > span { display: flex; align-items: center; gap: 10px; font-size: 14px; }
-.zones-raid > span > span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.zones-raid em { flex: none; font: 700 12px/16px var(--titre); font-style: normal; padding: 3px 9px; border-radius: 99px; background: rgba(240,84,74,.30); box-shadow: inset 0 0 0 1px var(--rouge); color: var(--texte); }
-.prochain.plein:not(.photo) .zones-raid em { background: rgba(20,20,23,.14); box-shadow: inset 0 0 0 1px rgba(20,20,23,.35); color: var(--sur-couleur); }
-/* Tuiles de l'accueil (TuileSection, EcranAccueil.kt). */
-.tuiles-accueil { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.tuile-a .sous-titre { margin-top: 10px; font: 700 9.5px/12px var(--titre); letter-spacing: 1.1px; text-transform: uppercase; color: var(--texte-discret); }
-.tuile-a .puce-a { display: flex; align-items: center; gap: 6px; margin-top: 5px; }
-.tuile-a .puce-a::before { content: ""; flex: none; width: 4px; height: 4px; border-radius: 1px; background: var(--c); }
-.tuile-a { position: relative; display: flex; flex-direction: column; width: 100%; padding: 12px 10px; background: var(--surface); border-radius: 6px; text-align: left; overflow: hidden; }
-.tuile-a::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: var(--c); }
-.tuile-a:hover { filter: brightness(1.08); }
-.tuile-a .tete { display: flex; align-items: center; gap: 5px; font: 700 9.5px/12px var(--titre); letter-spacing: 1.1px; text-transform: uppercase; color: var(--c); }
-.tuile-a .tete svg { width: 14px; height: 14px; fill: var(--c); flex: none; }
-.tuile-a .chiffre { margin-top: 10px; font-size: 12px; color: var(--texte-doux); }
-.tuile-a .chiffre b { font: 700 24px/26px var(--titre); color: var(--texte); }
-.tuile-a .pousse { flex: 1; }
-.tuile-a .coupe { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tuile-a .cases { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; margin-top: 10px; }
-.tuile-a .cases i { height: 9px; border-radius: 2px; box-shadow: inset 0 0 0 1px var(--trait); }
-.tuile-a .cases i.pleine { background: rgba(180,140,242,.8); box-shadow: none; }
+/* La meilleure zone du prochain raid, son nombre d'objets en pastille (PastilleNombre, EcranAccueil.kt). */
+.zone-raid { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 14px; }
+.zone-raid > span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.zone-raid em { flex: none; font: 700 12px/16px var(--titre); font-style: normal; padding: 3px 9px; border-radius: 99px; background: rgba(240,84,74,.30); box-shadow: inset 0 0 0 1px var(--rouge); color: var(--texte); }
+.prochain.plein:not(.photo) .zone-raid em { background: rgba(20,20,23,.14); box-shadow: inset 0 0 0 1px rgba(20,20,23,.35); color: var(--sur-couleur); }
+/* Liste de bord de l'accueil (LigneDeBord, EcranAccueil.kt) : une ligne par section, son chiffre à droite. */
+.bord { margin-top: 8px; background: var(--surface); border-radius: 6px; overflow: hidden; }
+.bord > button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 72px; padding: 12px 14px; text-align: left; }
+.bord > button + button { border-top: 1px solid var(--releve); }
+.bord > button:hover { background: rgba(243,238,228,.04); }
+.bord .ic-l { flex: none; width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; background: color-mix(in srgb, var(--c) 12%, transparent); }
+.bord .ic-l svg { width: 18px; height: 18px; fill: var(--c); }
+.bord .texte-l { flex: 1; min-width: 0; }
+.bord .texte-l b { display: block; font: 600 14px/20px var(--titre); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bord .texte-l b i { font-style: normal; color: var(--violet); }
+.bord .texte-l > span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 13px; line-height: 18px; color: var(--texte-doux); }
+.bord .chiffre-l { flex: none; font: 700 19px/22px var(--titre); }
 .prochain small { font: 700 11px var(--titre); letter-spacing: 2px; }
 .prochain strong { font: 700 22px/1.2 var(--titre); }
 /* « Meilleure carte » et « Ton prochain raid » sur une capture en jeu de la carte (FondEnJeu, FondCarte.kt) :
@@ -763,18 +757,18 @@ function ecranAccueil() {
   const h = new Date().getHours();
   return `${bandeauSection("ACCUEIL", `${h >= 18 || h < 5 ? "Bonsoir" : "Bonjour"}, Raider`)}
   ${prochainRaid()}
-  <div class="tuiles-accueil">${tuileObjets()}${tuileSection("CARTES", `<span class="sous-titre">Maintenant</span><span class="petit doux" style="margin-top:4px">Dans l'appli Android${NB}: la condition en cours et ce qu'il lui reste, puis la suivante, avec sa cloche si elle a une alerte.</span>`)}${tuileObjectifs()}${tuileBuild()}</div>
+  <div class="bord">${ligneObjets()}${ligneDeBord("CARTES", "Conditions de la carte", `Dans l'appli Android${NB}: la condition en cours, sa carte et ce qu'il lui reste.`)}${ligneObjectifs()}${ligneBuild()}</div>
   <p class="petit discret">Données du jeu ${echap(D.versionJeu)}, noms français officiels uniquement.</p>`;
 }
 
-// Où aller au prochain raid (ProchainRaid, EcranAccueil.kt) : la carte, combien d'objets on y trouve (et combien
-// tombent des ARC), puis ses deux meilleures zones avec leur nombre d'objets en pastille.
+// Où aller au prochain raid (ProchainRaid, EcranAccueil.kt) : la carte, combien d'objets on y trouve, puis sa
+// meilleure zone avec son nombre d'objets en pastille.
 function prochainRaid() {
   const restants = aTrouver().filter(x => !x.trouve), conseil = conseilRaid(restants.map(x => x.id)), premiere = conseil.cartes[0];
-  const nomC = id => cartes.get(id)?.nom ?? NOM_A_VERIFIER, arc = restants.filter(x => objets.get(x.id)?.lieux.includes("ARC")).length;
+  const nomC = id => cartes.get(id)?.nom ?? NOM_A_VERIFIER, zone = premiere?.zones[0];
   const contenu = premiere ? `<strong>Va sur ${echap(nomC(premiere.carteId))}</strong>
-      <b>${premiere.objets.length} de tes ${pluriel(restants.length, "objet", "objets")} à trouver${arc ? ` · ${arc} sur les ARC détruits` : ""}</b>
-      ${premiere.zones.length ? `<span class="zones-raid">${premiere.zones.slice(0, 2).map(z => `<span><span>${echap(z.zone)}</span><em>${pluriel(z.objets.length, "objet", "objets")}</em></span>`).join("")}</span>` : ""}`
+      <b>${premiere.objets.length} de tes ${pluriel(restants.length, "objet", "objets")} à trouver</b>
+      ${zone ? `<span class="zone-raid"><span>${echap(zone.zone)}</span><em>${pluriel(zone.objets.length, "objet", "objets")}</em></span>` : ""}`
     : restants.length ? `<strong>Rien dans le butin des cartes</strong><span class="doux">Ce qu'il te faut s'obtient autrement${NB}: regarde l'onglet Raid.</span>`
     : objectifs().length ? `<strong>Rien à chercher en raid</strong><span class="doux">Tes objectifs en cours ne demandent aucun objet${NB}: valide-les quand c'est fait en jeu.</span>`
     : `<strong>Rien à chercher pour l'instant</strong><span class="doux">Indique ce que tu as en cours (quêtes, ateliers, projets, expéditions)${NB}: l'appli te dira où aller.</span>`;
@@ -782,43 +776,34 @@ function prochainRaid() {
   return `<button class="prochain accueil ${premiere ? "plein" : ""}${photo ? ` photo" style="--photo:url('fonds/${premiere.carteId}.webp')` : ""}" data-action="onglet" data-onglet="${restants.length || objectifs().length ? "RAID" : "OBJECTIFS"}">${photo ? `<span class="fond-anime" aria-hidden="true"><span class="cadre"><i class="g1"></i><i class="g2"></i></span></span>` : ""}<small>TON PROCHAIN RAID</small>${contenu}<span class="bandes-pied" aria-hidden="true"><i></i><i></i><i></i><i></i></span></button>`;
 }
 
-// Une tuile de l'accueil (TuileSection, EcranAccueil.kt) : fin trait de la couleur de la section, son icône et son nom.
-function tuileSection(cle, contenu) {
+// Une ligne de la liste de bord (LigneDeBord, EcranAccueil.kt) : l'icône de la section sur une pastille de sa couleur,
+// un titre et sa précision, puis le chiffre à retenir à droite (rien quand il n'y en a pas). Titre et précision déjà échappés.
+function ligneDeBord(cle, titre, detail, chiffre = null, etoile = false) {
   const o = ONGLETS.find(x => x[0] === cle);
-  return `<button class="tuile-a" style="--c:var(${o[2]})" data-action="onglet" data-onglet="${cle}"><span class="tete"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${o[3]}"/></svg>${o[1]}</span>${contenu}</button>`;
+  return `<button style="--c:var(${o[2]})" data-action="onglet" data-onglet="${cle}"><span class="ic-l"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${o[3]}"/></svg></span><span class="texte-l"><b>${titre}${etoile ? " <i>★</i>" : ""}</b><span>${detail}</span></span>${chiffre === null ? "" : `<span class="chiffre-l">${chiffre}</span>`}</button>`;
 }
-const chiffre = (n, unite) => `<span class="chiffre"><b>${n}</b> ${unite}</span>`;
 
-// Ce qui est à garder, l'objet le plus demandé encore à trouver et ceux qui tombent des ARC (TuileObjets).
-function tuileObjets() {
+// Ce qui est à garder (objectifs et builds), avec l'objet le plus demandé encore à trouver (LigneObjets).
+function ligneObjets() {
   const restants = aTrouver().filter(x => !x.trouve).sort((a, b) => b.reste - a.reste), objs = objectifsDuRaid(), pb = aGarderBuilds();
-  const aGarder = D.objets.filter(o => verdict(o.id, objs, pb).type !== "inutile").length, arc = restants.filter(x => objets.get(x.id)?.lieux.includes("ARC")).length, p = restants[0];
-  return tuileSection("OBJETS", `${chiffre(aGarder, "à garder")}${p
-    ? `<span class="sous-titre">Le plus demandé</span><span class="ligne" style="gap:7px;margin-top:5px">${icone(p.id, 24)}<span class="petit coupe flex">${echap(nomObjet(p.id))}</span><b style="font:700 13px var(--titre);color:var(--or)">×${p.reste}</b></span>${arc ? `<span class="puce-a petit">${pluriel(arc, "objet", "objets")} sur les ARC détruits</span>` : ""}`
-    : `<span class="petit doux" style="margin-top:10px">Garder, recycler ou vendre${NB}?</span>`}`);
+  const aGarder = D.objets.filter(o => verdict(o.id, objs, pb).type !== "inutile").length, p = restants[0];
+  return ligneDeBord("OBJETS", "Objets à garder", p ? `Le plus demandé${NB}: ${echap(nomObjet(p.id))}` : `Garder, recycler ou vendre${NB}?`, aGarder);
 }
 
-// Les objectifs en cours par sorte, et celui qui est le plus près d'être fini (TuileObjectifs).
-function tuileObjectifs() {
-  const objs = objectifs(), l = listeDeCourses();
-  if (!objs.length) return tuileSection("OBJECTIFS", `${chiffre(0, "en cours")}<span class="petit doux" style="margin-top:10px">Touche pour indiquer tes quêtes, ateliers, projets ou expéditions</span>`);
-  const n = g => objs.filter(o => groupeObjectif(o) === g).length;
+// Les objectifs en cours, par sorte : quêtes, ateliers, projets, expéditions (LigneObjectifs).
+function ligneObjectifs() {
+  const objs = objectifs(), n = g => objs.filter(o => groupeObjectif(o) === g).length;
   const sortes = [[n("quetes"), "quête", "quêtes"], [n("ateliers"), "atelier", "ateliers"], [n("projets"), "projet", "projets"], [n("expeditions"), "expédition", "expéditions"]]
     .filter(x => x[0]).map(x => pluriel(...x)).join(" · ");
-  const parObjectif = new Map();
-  for (const ligne of l.lignes) for (const b of ligne.pour) { const v = parObjectif.get(b.libelle) || [0, 0]; v[0] += Math.min(b.apporte, b.quantite); v[1] += b.quantite; parObjectif.set(b.libelle, v); }
-  const proche = [...parObjectif].filter(([, v]) => v[1] && v[0] < v[1]).sort((a, b) => b[1][0] / b[1][1] - a[1][0] / a[1][1] || (a[1][1] - a[1][0]) - (b[1][1] - b[1][0]))[0]; // à égalité : celui à qui il manque le moins
-  return tuileSection("OBJECTIFS", `${chiffre(objs.length, "en cours")}<span class="petit doux" style="margin-top:3px">${sortes}</span>${proche
-    ? `<span class="sous-titre">Le plus proche</span><span class="petit coupe" style="margin-top:4px">${echap(proche[0])}</span><span class="ligne" style="gap:8px;margin-top:4px"><span class="barre flex" style="--c:var(--vert);height:3px"><i style="width:${proche[1][0] / proche[1][1] * 100}%"></i></span><span class="petit doux">${proche[1][0]}/${proche[1][1]}</span></span>` : ""}`);
+  return ligneDeBord("OBJECTIFS", "Objectifs en cours", sortes || "Touche pour indiquer tes quêtes, ateliers, projets ou expéditions", objs.length);
 }
 
-// Le build préféré (sinon le premier rempli) : son nom, ses cases et les matériaux pour le fabriquer (TuileBuild).
-function tuileBuild() {
+// Le build préféré (sinon le premier rempli) : les matériaux pour le fabriquer et ses cases remplies (LigneBuild).
+function ligneBuild() {
   const l = builds(), plein = b => Object.keys(b.objets).length, rang = l.findIndex(b => b.prefere && plein(b)) >= 0 ? l.findIndex(b => b.prefere && plein(b)) : l.findIndex(plein), b = l[rang];
-  if (!b) return tuileSection("BUILDS", `<span class="nom" style="margin-top:10px">Aucun build</span><span class="petit doux" style="margin-top:4px">Touche pour préparer ton équipement${NB}: ses objets passent en «${NB}Garder${NB}».</span>`);
+  if (!b) return ligneDeBord("BUILDS", "Aucun build", "Touche pour préparer ton équipement");
   const mat = aFabriquer(b);
-  return tuileSection("BUILDS", `<span class="nom" style="margin-top:10px;font-size:16px">${echap(nomBuild(b, rang))}${b.prefere ? " ★" : ""}</span><span class="petit doux">${plein(b)} cases sur ${CASES.length}</span>${mat.length
-    ? `<span class="sous-titre">Pour le fabriquer</span><span class="ligne" style="gap:5px;margin-top:6px">${mat.slice(0, 3).map(m => icone(m.id ?? m[0], 24)).join("")}</span><span class="petit doux" style="margin-top:5px">${pluriel(mat.length, "matériau", "matériaux")} à garder</span>` : ""}`);
+  return ligneDeBord("BUILDS", echap(nomBuild(b, rang)), mat.length ? `${pluriel(mat.length, "matériau", "matériaux")} à garder` : "Rien à fabriquer", `${plein(b)}/${CASES.length}`, b.prefere);
 }
 
 // Le verdict en un mot, pour la liste (PuceVerdict, EcranObjets.kt) : Garder (objectifs), Build, Vendre ou Recycler, encadré de sa couleur.
