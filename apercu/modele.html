@@ -308,6 +308,19 @@ h5 { margin: 6px 0 0; font: 600 14px var(--titre); color: var(--or); }
 .retour-raid .fen .or { color: var(--or); }
 @keyframes rr-bascule { 0%, 44% { transform: translateY(0); } 50%, 94% { transform: translateY(-16px); } 100% { transform: translateY(-32px); } }
 @media (prefers-reduced-motion: reduce) { .retour-raid svg path, .retour-raid .fen span { animation: none; opacity: 1; } }
+/* Pastille « Filmer mon inventaire » de l'onglet Objets (BoutonFilmerInventaire, EcranFilmerInventaire.kt) : verre doré. */
+.retour-raid.filmer button { background: linear-gradient(180deg, rgba(66,52,26,.86), rgba(44,35,19,.86)); box-shadow: 0 10px 26px rgba(0,0,0,.45), inset 0 0 0 1px rgba(242,178,51,.32);
+  font: 700 11px/16px var(--titre); letter-spacing: 2.2px; color: var(--texte); }
+.retour-raid.filmer svg path { fill: var(--or); opacity: 1; animation: none; }
+/* « Ce que tu peux vendre » (EcranInventaireFilme.kt) : le résumé doré au coin coupé, puis une ligne par objet. */
+.resume-filme { display: flex; flex-direction: column; gap: 2px; padding: 16px 18px; background: var(--or); color: var(--sur-couleur); clip-path: var(--coupee); }
+.resume-filme strong { font: 700 22px/1.25 var(--titre); }
+.resume-filme b { font: 700 16px/1.3 var(--titre); }
+.ligne-vente { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 5px 0; text-align: left; }
+.ligne-vente + .ligne-vente { border-top: 1px solid var(--releve); }
+.ligne-vente .prix { flex: none; font: 700 14px var(--titre); color: var(--or); }
+.groupe-garde { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.groupe-garde > span { display: flex; align-items: center; gap: 10px; font-size: 15px; }
 /* Accordéon (EnTeteAccordeon, Composants.kt) : le secondaire à un geste. */
 .accordeon { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 8px 12px 8px 14px; background: var(--surface); border-radius: 6px; text-align: left; }
 .accordeon b { font: 600 15px/1.3 var(--titre); }
@@ -743,6 +756,9 @@ const ouvert = cle => S.ouverts.has(cle);
 const accordeon = (cle, titre, resume, c) => `<button class="accordeon" style="--c:var(${c})" data-action="basculer" data-id="${echap(cle)}" aria-expanded="${ouvert(cle)}"><span class="flex"><b>${echap(titre)}</b>${resume ? `<br><span class="petit doux">${echap(resume)}</span>` : ""}</span><span class="fleche" aria-hidden="true">⌄</span></button>`;
 // Bouton principal fixé en bas (BoutonFixe) ; la liste garde de la place pour lui (.place-fixe).
 // Bouton « Retour de raid » du Raid (BoutonRetourRaid) : bandes du logo qui s'allument, texte qui bascule.
+// La pastille « Filmer mon inventaire » de l'onglet Objets (BoutonFilmerInventaire) : la caméra est propre à l'appli Android.
+const CAMERA = "M4 6h3.2L9 4h6l1.8 2H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zm8 2.6a4.4 4.4 0 1 0 0 8.8 4.4 4.4 0 0 0 0-8.8z";
+const boutonFilmer = () => `<div class="place-fixe"></div><div class="retour-raid filmer"><div><button data-action="filmer"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="${CAMERA}"/></svg>FILMER MON INVENTAIRE</button></div></div>`;
 const boutonRetourRaid = () => `<div class="place-fixe"></div><div class="retour-raid"><div><button data-action="raid" aria-label="Retour de raid${NB}: indiquer mon butin"><svg width="24" height="14" viewBox="0 0 35 20" aria-hidden="true"><path d="M0 20h5l7.2-20h-5z" fill="#3CC4D8"/><path d="M7.5 20h5l7.2-20h-5z" fill="#6CCB5F"/><path d="M15 20h5l7.2-20h-5z" fill="#F2B233"/><path d="M22.5 20h5l7.2-20h-5z" fill="#F0544A"/></svg><span class="fen" aria-hidden="true"><span>RETOUR DE RAID</span><span class="or">INDIQUER MON BUTIN</span><span>RETOUR DE RAID</span></span></button></div></div>`;
 const actionFixe = (texte, c, action) => `<div class="place-fixe"></div><div class="action-fixe"><button style="--c:var(${c})" data-action="${action}">${texte}</button></div>`;
 const etiquette = (texte, c, balise = "span") => `<${balise} class="etiquette" style="--c:var(${c})">${echap(texte)}</${balise}>`;
@@ -844,7 +860,60 @@ function ecranObjets() {
   ${!r.length ? `<p class="doux" style="margin:0">Aucun objet ne correspond.</p>` : !parSections ? `<p class="petit discret" style="margin:0">${pluriel(r.length, "objet trouvé", "objets trouvés")}</p>` : ""}
   <div id="liste-objets" style="display:flex;flex-direction:column;gap:6px">
   ${aGarder.length ? `${etiquette(`À garder · ${aGarder.length}`, "--vert", "h4")}${aGarder.map(([o, v]) => ligneObjet(o, v)).join("")}` : ""}
-  ${parSections && reste.length ? `${etiquette(`À vendre ou recycler · ${reste.length}`, "--or", "h4")}${lettres.map(([l, xs]) => `<h5 class="lettre">${l}</h5>${xs.map(([o, v]) => ligneObjet(o, v)).join("")}`).join("")}` : reste.map(([o, v]) => ligneObjet(o, v)).join("")}</div>`;
+  ${parSections && reste.length ? `${etiquette(`À vendre ou recycler · ${reste.length}`, "--or", "h4")}${lettres.map(([l, xs]) => `<h5 class="lettre">${l}</h5>${xs.map(([o, v]) => ligneObjet(o, v)).join("")}`).join("")}` : reste.map(([o, v]) => ligneObjet(o, v)).join("")}</div>
+  ${boutonFilmer()}`;
+}
+
+// ---- Filmer mon inventaire (TriInventaire.kt, EcranFilmerInventaire.kt, EcranInventaireFilme.kt) ----
+// Le même verdict que la liste des objets : ce dont aucun objectif en cours ni aucun build n'a besoin se vend (ou se
+// recycle, si ça rapporte plus). D'une pile que les objectifs demandent encore, on garde ce qui manque et on vend le
+// reste ; nombre illisible ou build : on garde tout.
+function deciderInventaire(id, q, objs, pb) {
+  const v = verdict(id, objs, pb);
+  if (v.type === "garder") return v.builds.length || q == null || q <= v.manquant
+    ? { id, aVendre: 0, aGarder: q, etiquette: "GARDE", v } : { id, aVendre: q - v.manquant, aGarder: v.manquant, etiquette: "VENDS_EN_PARTIE", v };
+  if (v.type === "build") return { id, aVendre: 0, aGarder: q, etiquette: "BUILD", v };
+  return { id, aVendre: q ?? 1, aGarder: 0, etiquette: v.sortie === "RECYCLER" ? "RECYCLE" : "VENDS", v };
+}
+const comparer = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+// Le bilan (TriInventaire.bilan) : à vendre du plus rentable au moins rentable, à garder par objectif puis par build.
+function bilanInventaire(liste, pasSur) {
+  const objs = objectifsDuRaid(), pb = aGarderBuilds(), ventes = [], groupes = new Map();
+  for (const [id, q] of liste) {
+    const d = deciderInventaire(id, q, objs, pb), o = objets.get(id);
+    if (d.aVendre > 0) {
+      const recycler = d.etiquette === "RECYCLE", prix = !o ? 0 : recycler ? valeurRecyclage(o) : o.valeur;
+      ventes.push({ id, nom: nomObjet(id), quantite: d.aVendre, sur: d.etiquette === "VENDS_EN_PARTIE" ? q : null, prix, recycler, total: d.aVendre * prix });
+    }
+    const g = d.v.type === "garder" ? (d.v.pour[0] ? [d.v.pour[0].libelle, false] : null) : d.v.type === "build" ? [`Build «${NB}${d.v.builds[0].build}${NB}»`, true] : null;
+    if (g) {
+      const cle = `${g[1]}|${g[0]}`;
+      if (!groupes.has(cle)) groupes.set(cle, { libelle: g[0], build: g[1], objets: [] });
+      groupes.get(cle).objets.push([id, d.aGarder]);
+    }
+  }
+  ventes.sort((a, b) => b.total - a.total || comparer(normaliser(a.nom), normaliser(b.nom)));
+  const aGarder = [...groupes.values()].sort((a, b) => a.build - b.build)
+    .map(g => ({ ...g, objets: g.objets.sort((x, y) => comparer(normaliser(nomObjet(x[0])), normaliser(nomObjet(y[0])))) }));
+  return { aVendre: ventes, aGarder, pasSur, total: ventes.reduce((s, l) => s + l.total, 0), objetsAGarder: aGarder.reduce((s, g) => s + g.objets.length, 0) };
+}
+const milliers = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, NB);
+// Un exemple d'inventaire filmé (le même que les maquettes) : la caméra en direct est propre à l'appli Android.
+const EXEMPLE_INVENTAIRE = [["bronze_statuette", 1], ["mechanical_components", 8], ["breathtaking_snow_globe", 1], ["wasp_driver", 1], ["tellurion", 1],
+  ["rubber_parts", 12], ["apricot", 3], ["electrical_components", 2], ["geiger_counter", 1], ["bandage", 3], ["fossilized_lightning", 1], ["rusted_tools", 1],
+  ["magnetron", 1], ["mushroom", 2], ["snitch_scanner", 2], ["flow_controller", 1], ["plastic_parts", 6], ["resin", 4], ["spectrum_analyzer", 1]].filter(([id]) => objets.has(id));
+function ligneVente(l) {
+  const detail = l.sur != null ? `${l.quantite} sur ${l.sur} · garde ${l.sur - l.quantite}` : l.recycler ? `À recycler${l.quantite > 1 ? ` · ×${l.quantite}` : ""}` : l.quantite > 1 ? `×${l.quantite}` : "";
+  return `<button class="ligne-vente" data-action="fiche" data-id="${l.id}">${icone(l.id, 34)}<span class="flex" style="min-width:0"><span class="nom" style="font-size:14px">${echap(l.nom)}</span>${detail ? `<br><span class="petit doux">${detail}</span>` : ""}</span><span class="prix">${milliers(l.total)}</span></button>`;
+}
+function ecranFilmer() {
+  const b = bilanInventaire(EXEMPLE_INVENTAIRE, 1);
+  return `${retour("Objets", "--or")}<h3>Filmer mon inventaire</h3>
+  <div class="note-apercu petit doux">Dans l'appli Android, la caméra filme ton inventaire en jeu${NB}: une étiquette se pose sur chaque case (VENDS, GARDE, BUILD, ou «${NB}?${NB}» quand ce n'est pas sûr) et la liste «${NB}À vendre${NB}» se remplit pendant que tu fais défiler. Tout se fait sur le téléphone${NB}: rien n'est enregistré ni envoyé. Ici, un exemple d'inventaire filmé, trié avec tes objectifs en cours et tes builds.</div>
+  <div class="resume-filme"><strong>${b.aVendre.length ? `${pluriel(b.aVendre.length, "objet", "objets")} à vendre` : "Rien à vendre"}</strong>${b.aVendre.length ? `<b>≈${NB}${milliers(b.total)}${NB}pièces</b>` : ""}<span class="petit" style="margin-top:6px">Rien n'est gardé${NB}: cette liste s'efface quand tu la fermes.</span></div>
+  <div>${b.aVendre.map(ligneVente).join("")}</div>
+  ${b.aGarder.length ? `${etiquette(`À garder · ${b.objetsAGarder}`, "--vert", "h4")}${b.aGarder.map(g => `<div class="groupe-garde"><span class="petit" style="font-weight:600;color:var(${g.build ? "--violet" : "--vert"})">${echap(g.libelle)}</span>${g.objets.map(([id, q]) => `<span>${icone(id, 28)}<span class="flex">${echap(nomObjet(id))}</span><span class="petit doux">${q == null ? "tout" : `×${q}`}</span></span>`).join("")}</div>`).join("")}` : ""}
+  ${b.pasSur ? `${etiquette(`Pas sûr · ${b.pasSur}`, "--texte-doux", "h4")}<p class="petit doux" style="margin:0">Cette case n'a pas été reconnue sûrement${NB}: rien n'est compté à vendre pour elle. Refilme de plus près, sans reflet sur l'écran.</p>` : ""}`;
 }
 
 // Fiche d'un objet, dans l'ordre où le joueur se pose les questions : verdict, à quoi il peut servir, où le trouver, ce qu'il rapporte.
@@ -1443,7 +1512,7 @@ function rendre() {
   document.getElementById("contenu").innerHTML =
     e?.type === "fiche" ? ecranFiche(e.id) : e === "plan" ? ecranPlan() : e === "quetes" ? ecranQuetes() : e === "ateliers" ? ecranAteliers()
     : e === "projets" ? ecranProjets(false) : e === "expeditions" ? ecranProjets(true) : e === "choix-build" ? ecranChoixBuild()
-    : e === "raid" ? ecranRaid() : e === "reglages" ? ecranReglages() : e === "choix-butin" ? ecranChoixButin()
+    : e === "raid" ? ecranRaid() : e === "reglages" ? ecranReglages() : e === "choix-butin" ? ecranChoixButin() : e === "filmer" ? ecranFilmer()
     : { ACCUEIL: ecranAccueil, OBJETS: ecranObjets, RAID: ecranOngletRaid, CARTES: ecranCartes, OBJECTIFS: ecranObjectifs, BUILDS: ecranBuilds }[S.onglet]();
   document.getElementById("nav").innerHTML = ONGLETS.map(([k, t, c, d]) => `<button data-action="onglet" data-onglet="${k}" style="--c:var(${c})" ${S.onglet === k && !S.ecran ? `aria-current="page" class="${ongletAffiche === k ? "arrive" : ""}"` : ""}><span class="pastille"><svg class="ic" viewBox="0 0 24 24"><path d="${d}"/></svg></span>${t}</button>`).join("");
   placerGlisseur();
@@ -1485,6 +1554,7 @@ document.addEventListener("click", ev => {
     case "fiche": S.precedent = S.ecran; return ouvrir({ type: "fiche", id });
     case "fermer": S.ecran = S.ecran === "plan" && P.depuis ? P.depuis : S.ecran?.type === "fiche" && S.precedent ? S.precedent : null; P.depuis = null; S.precedent = null; rendre(); return;
     case "reglages": return ouvrir("reglages");
+    case "filmer": return ouvrir("filmer");
     case "en-cours": S.choix = null; S.rechercheQuetes = ""; return ouvrir(id);
     case "raid":
       // État à l'ouverture (bilan, annulation) ; la liste est figée : un objet qui atteint son nombre ne disparaît pas sous le doigt.

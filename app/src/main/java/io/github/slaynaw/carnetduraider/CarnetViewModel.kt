@@ -32,6 +32,8 @@ import io.github.slaynaw.carnetduraider.core.Verdict
 import io.github.slaynaw.carnetduraider.core.calendrier.Calendrier
 import io.github.slaynaw.carnetduraider.core.calendrier.DonneesCalendrier
 import io.github.slaynaw.carnetduraider.core.calendrier.Region
+import io.github.slaynaw.carnetduraider.core.inventaire.SuiviInventaire
+import io.github.slaynaw.carnetduraider.core.inventaire.TriInventaire
 
 /**
  * État de l'appli : données du jeu (embarquées) et ce que le joueur a en cours. Tout est fait d'office, sauf
@@ -295,6 +297,17 @@ class CarnetViewModel(application: Application) : AndroidViewModel(application) 
 
     /** Filtres de la liste des objets (« Recycler » seulement s'il peut servir). */
     val filtresObjets: List<FiltreVerdict> get() = conseiller.filtres
+
+    /** Filmer mon inventaire : le tri de ce que montre la caméra, avec le même verdict que la liste des objets. */
+    val triInventaire = TriInventaire(catalogue) { verdict(it) }
+
+    /**
+     * Ce que la caméra a vu depuis qu'elle est ouverte (le temps de faire défiler l'inventaire en jeu) : en mémoire
+     * seulement, jamais enregistré, effacé à sa fermeture ([viderInventaireFilme]). Une rotation de l'écran le garde.
+     */
+    val suiviInventaire = SuiviInventaire(triInventaire)
+
+    fun viderInventaireFilme() = suiviInventaire.vider()
 
     /** À quoi peut servir l'objet dans le jeu (explication, sans effet sur le verdict). */
     fun usagesDe(objetId: String): UsagesObjet = usages.pour(objetId)

@@ -75,6 +75,8 @@ fun CarnetApp(ongletDemande: Onglet? = null, demandeTraitee: () -> Unit = {}, vm
     var choixButin by rememberSaveable { mutableStateOf(false) }
     var planOuvert by rememberSaveable { mutableStateOf<String?>(null) }
     var planRecherche by rememberSaveable { mutableStateOf("") }
+    // Filmer mon inventaire : la caméra en plein écran, par-dessus tout le reste.
+    var filmer by rememberSaveable { mutableStateOf(false) }
     val calendrier by vm.calendrier.etat.collectAsStateWithLifecycle()
     val calendrierOfficiel = remember(calendrier.donnees) { calendrier.donnees?.let(vm::calendrierOfficiel) }
     val miseAJour by vm.miseAJour.etat.collectAsStateWithLifecycle()
@@ -98,7 +100,14 @@ fun CarnetApp(ongletDemande: Onglet? = null, demandeTraitee: () -> Unit = {}, vm
         }
     }
 
+    // La caméra fermée, ce qu'elle a vu s'efface : rien n'est gardé.
+    fun fermerCamera() {
+        filmer = false
+        vm.viderInventaireFilme()
+    }
+
     fun aller(cible: Onglet) {
+        if (filmer) fermerCamera()
         objetOuvert = null
         reglages = false
         choixEnCours = null
@@ -210,7 +219,7 @@ fun CarnetApp(ongletDemande: Onglet? = null, demandeTraitee: () -> Unit = {}, vm
                             calendrier = calendrierOfficiel,
                             afficherMiseAJour = { dialogueMiseAJour = true },
                         )
-                        Onglet.OBJETS -> EcranObjets(vm, recherche, { recherche = it }, ouvrir = { objetOuvert = it })
+                        Onglet.OBJETS -> EcranObjets(vm, recherche, { recherche = it }, ouvrir = { objetOuvert = it }, filmer = { filmer = true })
                         Onglet.RAID -> EcranRaid(
                             vm,
                             ouvrir = { objetOuvert = it },
@@ -237,6 +246,9 @@ fun CarnetApp(ongletDemande: Onglet? = null, demandeTraitee: () -> Unit = {}, vm
 
         // Fin du retour de raid : objets trouvés, objectifs terminés, raid terminé.
         vm.celebration?.let { bilan -> CelebrationRaid(vm, bilan, onFin = vm::finCelebration) }
+
+        // Filmer mon inventaire : ce qui se vend sans souci, en direct (son retour à lui ferme la caméra).
+        if (filmer) EcranFilmerInventaire(vm, onFermer = ::fermerCamera)
     }
 
     if (dialogueMiseAJour && miseAJour.nouvelle != null) {
