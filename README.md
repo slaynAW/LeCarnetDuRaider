@@ -11,6 +11,12 @@ Application Android compagnon pour **ARC Raiders**, à garder à côté du clavi
   compte des accents), avec un verdict dès la liste : *Garder* (un objectif en cours en demande encore),
   *Build* (il est dans un de tes builds, ou sert à le fabriquer), sinon *Vendre* ou *Recycler*
   (comparaison en pièces).
+- **Filmer mon inventaire.** Depuis l'onglet Objets, la caméra du téléphone filme l'inventaire à l'écran
+  du jeu : une étiquette se pose sur chaque case (*VENDS*, *GARDE*, *BUILD*, ou « ? » quand ce n'est pas
+  sûr), et la liste de ce qui se vend sans souci se remplit pendant qu'on fait défiler, avec son total en
+  pièces. D'une pile que demandent encore tes objectifs, l'appli garde ce qui manque et dit combien en
+  vendre. La reconnaissance se fait sur le téléphone, avec les icônes officielles : aucune image n'est
+  enregistrée ni envoyée.
 - **À quoi il peut servir.** Sur sa fiche, même s'il est à vendre : la description du jeu et tout ce
   qui le demande (fabrications, niveaux d'établis, quêtes, étapes de projets, clés, équipement, schémas
   à apprendre, Station de recherche, Avant-poste, échanges chez les commerçants).
@@ -45,7 +51,7 @@ Application Android compagnon pour **ARC Raiders**, à garder à côté du clavi
 - **Sauvegarde chiffrée.** Tes données sont sauvegardées automatiquement dans un fichier chiffré
   avec ton mot de passe, rangé où tu veux (Google Drive pour les retrouver sur un autre téléphone).
 - **Sans compte.** Les données du jeu sont embarquées dans l'appli ; elle ne se connecte jamais à ton
-  compte Embark ni aux serveurs du jeu, et ne touche jamais au jeu.
+  compte Embark ni aux serveurs du jeu, et ne touche jamais au jeu (la caméra filme seulement l'écran).
 - **Mises à jour sécurisées depuis GitHub.** À chaque lancement, l'appli cherche les nouvelles
   versions officielles et les propose avec leurs nouveautés. Chacune est signée par la CI avec la clé de l'appli et vérifiée
   avant l'installation ([docs/MISES-A-JOUR.md](docs/MISES-A-JOUR.md)).

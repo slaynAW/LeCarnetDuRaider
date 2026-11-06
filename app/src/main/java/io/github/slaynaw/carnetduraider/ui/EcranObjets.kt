@@ -64,7 +64,7 @@ import io.github.slaynaw.carnetduraider.core.Verdict
 import io.github.slaynaw.carnetduraider.ui.theme.Signal
 
 @Composable
-fun EcranObjets(vm: CarnetViewModel, recherche: String, onRecherche: (String) -> Unit, ouvrir: (String) -> Unit) {
+fun EcranObjets(vm: CarnetViewModel, recherche: String, onRecherche: (String) -> Unit, ouvrir: (String) -> Unit, filmer: () -> Unit) {
     var filtre by rememberSaveable { mutableStateOf(FiltreVerdict.TOUS) }
     // Sans recherche : tout le catalogue, par ordre alphabétique.
     val resultats = remember(recherche) {
@@ -78,67 +78,72 @@ fun EcranObjets(vm: CarnetViewModel, recherche: String, onRecherche: (String) ->
     val reste = if (parSections) affiches.filter { verdicts.getValue(it.id) is Verdict.Inutile } else affiches
 
     EcranDeSection(Onglet.OBJETS, "Garder, vendre ou recycler") { defilement, haut ->
-        LazyColumn(
-            Modifier.fillMaxSize(),
-            state = defilement,
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = haut + 12.dp, bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(bottom = 4.dp)) {
-                    OutlinedTextField(
-                        value = recherche,
-                        onValueChange = onRecherche,
-                        placeholder = { Text("Cherche un objet…") },
-                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = Signal.Or) },
-                        trailingIcon = if (recherche.isNotEmpty()) {
-                            { IconButton(onClick = { onRecherche("") }) { Icon(Icons.Filled.Close, contentDescription = "Effacer la recherche", tint = Signal.TexteDoux) } }
-                        } else {
-                            null
-                        },
-                        singleLine = true,
-                        shape = RoundedCornerShape(6.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Signal.Or,
-                            unfocusedBorderColor = Signal.Trait,
-                            focusedContainerColor = Signal.Surface,
-                            unfocusedContainerColor = Signal.Surface,
-                        ),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        vm.filtresObjets.forEach { f ->
-                            val n = if (f == FiltreVerdict.TOUS) resultats.size else resultats.count { f.accepte(verdicts.getValue(it.id)) }
-                            PuceFiltre("${f.libelle} · $n", choisie = f == filtre, couleur = Signal.Or, onClick = { filtre = f })
+        Box(Modifier.fillMaxSize()) {
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                state = defilement,
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = haut + 12.dp, bottom = PLACE_BOUTON_RETOUR),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(bottom = 4.dp)) {
+                        OutlinedTextField(
+                            value = recherche,
+                            onValueChange = onRecherche,
+                            placeholder = { Text("Cherche un objet…") },
+                            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = Signal.Or) },
+                            trailingIcon = if (recherche.isNotEmpty()) {
+                                { IconButton(onClick = { onRecherche("") }) { Icon(Icons.Filled.Close, contentDescription = "Effacer la recherche", tint = Signal.TexteDoux) } }
+                            } else {
+                                null
+                            },
+                            singleLine = true,
+                            shape = RoundedCornerShape(6.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Signal.Or,
+                                unfocusedBorderColor = Signal.Trait,
+                                focusedContainerColor = Signal.Surface,
+                                unfocusedContainerColor = Signal.Surface,
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            vm.filtresObjets.forEach { f ->
+                                val n = if (f == FiltreVerdict.TOUS) resultats.size else resultats.count { f.accepte(verdicts.getValue(it.id)) }
+                                PuceFiltre("${f.libelle} · $n", choisie = f == filtre, couleur = Signal.Or, onClick = { filtre = f })
+                            }
+                        }
+                        if (affiches.isEmpty()) {
+                            Text("Aucun objet ne correspond.", style = MaterialTheme.typography.bodyMedium, color = Signal.TexteDoux)
+                        } else if (!parSections) {
+                            Text(pluriel(affiches.size, "objet trouvé", "objets trouvés"), style = MaterialTheme.typography.bodySmall, color = Signal.TexteDiscret)
                         }
                     }
-                    if (affiches.isEmpty()) {
-                        Text("Aucun objet ne correspond.", style = MaterialTheme.typography.bodyMedium, color = Signal.TexteDoux)
-                    } else if (!parSections) {
-                        Text(pluriel(affiches.size, "objet trouvé", "objets trouvés"), style = MaterialTheme.typography.bodySmall, color = Signal.TexteDiscret)
+                }
+                if (aGarder.isNotEmpty()) {
+                    item(key = "titre-garder") { Etiquette("À garder · ${aGarder.size}", Signal.Vert, Modifier.padding(top = 4.dp)) }
+                    items(aGarder, key = { it.id }) { objet -> LigneObjet(vm, objet, verdicts.getValue(objet.id), onClick = { ouvrir(objet.id) }) }
+                }
+                if (parSections && reste.isNotEmpty()) {
+                    item(key = "titre-reste") { Etiquette("À vendre ou recycler · ${reste.size}", Signal.Or, Modifier.padding(top = 10.dp)) }
+                    reste.groupBy { initiale(it.nom) }.forEach { (lettre, objets) ->
+                        item(key = "lettre-$lettre") {
+                            Text(
+                                lettre,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = Signal.Or,
+                                modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 2.dp).semantics { heading() },
+                            )
+                        }
+                        items(objets, key = { it.id }) { objet -> LigneObjet(vm, objet, verdicts.getValue(objet.id), onClick = { ouvrir(objet.id) }) }
                     }
+                } else if (!parSections) {
+                    items(reste, key = { it.id }) { objet -> LigneObjet(vm, objet, verdicts.getValue(objet.id), onClick = { ouvrir(objet.id) }) }
                 }
             }
-            if (aGarder.isNotEmpty()) {
-                item(key = "titre-garder") { Etiquette("À garder · ${aGarder.size}", Signal.Vert, Modifier.padding(top = 4.dp)) }
-                items(aGarder, key = { it.id }) { objet -> LigneObjet(vm, objet, verdicts.getValue(objet.id), onClick = { ouvrir(objet.id) }) }
-            }
-            if (parSections && reste.isNotEmpty()) {
-                item(key = "titre-reste") { Etiquette("À vendre ou recycler · ${reste.size}", Signal.Or, Modifier.padding(top = 10.dp)) }
-                reste.groupBy { initiale(it.nom) }.forEach { (lettre, objets) ->
-                    item(key = "lettre-$lettre") {
-                        Text(
-                            lettre,
-                            style = MaterialTheme.typography.titleSmall,
-                            color = Signal.Or,
-                            modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 2.dp).semantics { heading() },
-                        )
-                    }
-                    items(objets, key = { it.id }) { objet -> LigneObjet(vm, objet, verdicts.getValue(objet.id), onClick = { ouvrir(objet.id) }) }
-                }
-            } else if (!parSections) {
-                items(reste, key = { it.id }) { objet -> LigneObjet(vm, objet, verdicts.getValue(objet.id), onClick = { ouvrir(objet.id) }) }
-            }
+
+            // Filmer son inventaire en jeu : ce qui se vend sans souci, en direct. Toujours à portée de pouce.
+            BoutonFilmerInventaire(filmer, Modifier.align(Alignment.BottomEnd))
         }
     }
 }

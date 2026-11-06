@@ -14,6 +14,8 @@ androidx-core = "1.19.1"
 androidx-activity = "1.13.0"
 androidx-lifecycle = "2.11.0"
 compose-bom = "2026.09.00"
+# Filmer mon inventaire : la caméra en direct (aperçu et analyse des images, sur le téléphone).
+camerax = "1.6.2"
 
 junit = "6.1.3"
 
@@ -33,6 +35,11 @@ compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
 compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
 compose-material3 = { module = "androidx.compose.material3:material3" }
 compose-material-icons-core = { module = "androidx.compose.material:material-icons-core" }
+
+androidx-camera-core = { module = "androidx.camera:camera-core", version.ref = "camerax" }
+androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
+androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
+androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
 
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }

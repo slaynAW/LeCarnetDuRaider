@@ -5,6 +5,11 @@ Chaque section « ## X.Y.Z » est affichée dans l'application au moment de prop
 avant de publier une version (docs/MISES-A-JOUR.md). Les noms du jeu cités ici suivent la même règle
 que l'application : uniquement les traductions françaises officielles d'Embark Studios.
 
+## 0.15.0
+
+- **Filmer mon inventaire** : dans l'onglet Objets, la pastille « Filmer mon inventaire » ouvre la caméra. Vise l'inventaire à l'écran du jeu : une étiquette se pose sur chaque case (VENDS, GARDE, BUILD, ou « ? » quand ce n'est pas sûr), et la liste de ce qui se vend sans souci se remplit pendant que tu fais défiler, avec son total en pièces. D'une pile que tes objectifs demandent encore, l'appli garde ce qui manque et te dit combien en vendre. « Terminé » montre la liste complète.
+- **Rien ne sort du téléphone** : la reconnaissance se fait sur le téléphone, avec les icônes officielles ; aucune image n'est enregistrée ni envoyée, et la liste s'efface quand tu fermes la caméra. Tiens le téléphone bien en face de l'écran, sans reflet ; une case reconnue sans certitude n'est jamais comptée à vendre.
+
 ## 0.14.6
 
 - **Accueil plus léger** : sous ton prochain raid (la carte et sa meilleure zone), une seule carte avec une ligne par section et son chiffre à droite. Les objets à garder et le plus demandé ; la condition de la carte en cours, sa carte et ce qu'il lui reste ; tes objectifs en cours ; ton build préféré, ses matériaux et ses cases remplies. Chaque ligne mène à son onglet.

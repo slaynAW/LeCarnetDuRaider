@@ -155,6 +155,20 @@ guillemets `« … »`. Apostrophe droite `'` acceptée dans le code.
   liste du raid (à trouver, meilleure carte, retour de raid, verdict « Garder »), jamais dans l'onglet
   Objectifs ; le butin va d'abord aux objectifs du jeu, puis à eux ; un objet dont tout a été rapporté
   quitte la liste à la validation du retour de raid (`ButinRecherche.terminerLesComplets`).
+- Filmer mon inventaire (`core/…/inventaire`, `app/…/inventaire`, `ui/EcranFilmerInventaire.kt`,
+  `ui/EcranInventaireFilme.kt`, proposition C du canevas) : pastille dorée « FILMER MON INVENTAIRE » de l'onglet
+  Objets (`BoutonFilmerInventaire`) ; caméra en direct (CameraX, autorisation Caméra demandée à la première
+  ouverture), une étiquette sur chaque case reconnue (VENDS, VENDS n, RECYCLE, GARDE, BUILD, « ? »), et dessous la
+  liste « À vendre » qui se remplit avec son total ; « Terminé » ouvre la liste complète (à garder par objectif
+  puis par build). Reconnaissance sur le téléphone, jamais en ligne : grille des cases (`DetectionGrille` : bords
+  qui reviennent à pas fixe, téléphone en face de l'écran), icône comparée aux icônes officielles de l'appli
+  (`Reconnaisseur` : sous le détourage, puis posée sur le fond de la case ; « sûr » seulement au-dessus d'un seuil
+  et nettement devant la suivante, sinon « Pas sûr », jamais compté à vendre), nombre lu dans le coin de la case
+  (`LectureNombre`, illisible plutôt que faux). Seuils à régler sur de vraies images filmées. Verdict de l'onglet
+  Objets (`TriInventaire`) : d'une pile que les objectifs demandent encore, garder ce qui manque et vendre le
+  reste ; nombre illisible ou build : tout garder. Cumul pendant qu'on fait défiler (`SuiviInventaire` : un objet
+  compte après deux images, son nombre est le plus souvent lu). Rien n'est enregistré ni envoyé : les images sont
+  analysées puis oubliées, la liste s'efface à la fermeture (pas de réserve).
 - Retour de raid (`core/RetourDeRaid.kt`, `ui/EcranRetourRaid.kt`), le seul endroit où le joueur note
   des objets : seulement ce qui manque, sans pouvoir dépasser. `Planificateur.repartir` donne le butin
   aux objectifs qui le demandent (objectifs du jeu, puis butin recherché), le plus près d'être terminé
@@ -177,7 +191,8 @@ guillemets `« … »`. Apostrophe droite `'` acceptée dans le code.
   fois (le prochain), calculé sur le calendrier gardé sur le téléphone ; reprogrammé au démarrage du
   téléphone, à la mise à jour de l'appli et quand le calendrier ou les réglages changent.
 - Connexions de l'appli : uniquement GitHub (mises à jour) et arcraiders.com (calendrier). Jamais le
-  compte Embark ni les serveurs du jeu, jamais de jeton de connexion du joueur.
+  compte Embark ni les serveurs du jeu, jamais de jeton de connexion du joueur. La caméra (Filmer mon
+  inventaire) n'envoie rien : la reconnaissance se fait sur le téléphone.
 - Mises à jour intégrées (`core/…/miseajour`, `app/…/miseajour`) : vers les Releases GitHub du dépôt,
   qui doit être **public** (sinon l'appli ne peut pas lire les fichiers publiés). Le manifeste
   `update.json` est signé par la CI avec la clé de l'APK et vérifié avec le certificat de l'appli
@@ -192,8 +207,8 @@ https://claude.ai/artifact/5pwyAtzHArvPaTgxtnU3ek. **À chaque fonction ajoutée
 l'appli, reporter le changement dans `apercu/modele.html`**, puis `python3 apercu/construire.py`
 et republier `apercu/index.html` sur la même URL, avec en fichiers joints `apercu/icones.json` et les
 plans `apercu/cartes/<carte>.webp`. Ce qui
-ne peut pas tourner dans une page web (calendrier en direct, alertes, mises à jour) y est signalé
-comme propre à l'appli Android.
+ne peut pas tourner dans une page web (calendrier en direct, alertes, mises à jour, caméra de « Filmer mon
+inventaire », dont l'aperçu trie un exemple d'inventaire) y est signalé comme propre à l'appli Android.
 
 ## Publication et clé de signature
 
