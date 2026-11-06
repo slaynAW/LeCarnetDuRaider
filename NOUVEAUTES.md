@@ -5,6 +5,12 @@ Chaque section « ## X.Y.Z » est affichée dans l'application au moment de prop
 avant de publier une version (docs/MISES-A-JOUR.md). Les noms du jeu cités ici suivent la même règle
 que l'application : uniquement les traductions françaises officielles d'Embark Studios.
 
+## 0.15.2
+
+- **Filmer mon inventaire, en direct** : chaque case que la caméra voit est entourée d'un fin cadre, même tant que l'objet n'est pas reconnu, et un compteur dit combien de cases sont vues et combien sont reconnues. Tu sais tout de suite si ta Réserve est bien trouvée.
+- **Moins sensible au flou** : les cases sont retrouvées même quand l'image est un peu floue (mise au point, main qui bouge), et les objets reconnus plus souvent. Si les cases sont vues mais pas les objets, touche l'image pour faire la mise au point et tiens le téléphone immobile un instant.
+- **Reflets** : une case couverte par le reflet d'une lampe n'est jamais prise pour un objet.
+
 ## 0.15.1
 
 - **Filmer mon inventaire reconnaît enfin tes objets** : la reconnaissance a été refaite sur une vraie vidéo de la Réserve filmée au téléphone. Chaque case est trouvée par son cadre, même filmée un peu de biais ; la rareté se lit à la couleur du halo de la case ; dans la bande du bas, la quantité « ×24 » et le niveau des armes (I, II, III, IV) sont lus.

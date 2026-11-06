@@ -155,7 +155,10 @@ object ImagesDeTest {
             val ny = cy + dx * sin(a) + dy * cos(a)
             Zone((nx - z.largeur / 2.0).roundToInt(), (ny - z.hauteur / 2.0).roundToInt(), z.largeur, z.hauteur)
         }
-        return Ecran(filmer(tournee, alea), zonesTournees, cases)
+        // Un reflet (une lampe sur l'écran) est pris par la caméra elle-même : il sature le capteur, au centre.
+        val filmee = filmer(tournee, alea)
+        for ((k, case) in cases.withIndex()) if (case.reflet) refleter(filmee, zonesTournees[k])
+        return Ecran(filmee, zonesTournees, cases)
     }
 
     /** Une case comme le jeu la dessine (voir [ecran]). */
@@ -222,16 +225,18 @@ object ImagesDeTest {
             dessiner(image, motif, x, y, echelle, BLANC)
             x += (motif[0].length + 2) * echelle
         }
-        if (case.reflet) {
-            val cx = z.x + z.largeur * 0.45
-            val cy = z.y + z.hauteur * 0.4
-            for (y in z.y until z.bas) for (x2 in z.x until z.droite) {
-                val d = hypot(x2 - cx, y - cy) / (z.largeur * 0.55)
-                if (d >= 1.0) continue
-                val i = y * image.largeur + x2
-                val m = melange(intArrayOf((image.pixels[i] shr 16) and 0xFF, (image.pixels[i] shr 8) and 0xFF, image.pixels[i] and 0xFF), intArrayOf(255, 255, 255), (1 - d) * 0.95)
-                image.pixels[i] = ImageRgb.argb(255, m[0], m[1], m[2])
-            }
+    }
+
+    /** Un reflet blanc sur la case [z] : saturé au centre, qui s'estompe vers les bords. */
+    private fun refleter(image: ImageRgb, z: Zone) {
+        val cx = z.x + z.largeur * 0.45
+        val cy = z.y + z.hauteur * 0.4
+        for (y in max(0, z.y) until min(image.hauteur, z.bas)) for (x in max(0, z.x) until min(image.largeur, z.droite)) {
+            val d = hypot(x - cx, y - cy) / (z.largeur * 0.55)
+            if (d >= 1.0) continue
+            val i = y * image.largeur + x
+            val m = melange(intArrayOf((image.pixels[i] shr 16) and 0xFF, (image.pixels[i] shr 8) and 0xFF, image.pixels[i] and 0xFF), intArrayOf(255, 255, 255), min(1.0, (1 - d) * 1.6))
+            image.pixels[i] = ImageRgb.argb(255, m[0], m[1], m[2])
         }
     }
 
