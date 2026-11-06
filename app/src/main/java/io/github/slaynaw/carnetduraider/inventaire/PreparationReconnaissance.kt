@@ -7,6 +7,9 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
+import androidx.core.content.res.ResourcesCompat
+import io.github.slaynaw.carnetduraider.R
+import io.github.slaynaw.carnetduraider.core.Objet
 import io.github.slaynaw.carnetduraider.core.inventaire.AnalyseInventaire
 import io.github.slaynaw.carnetduraider.core.inventaire.ImageRgb
 import io.github.slaynaw.carnetduraider.core.inventaire.LectureNombre
@@ -20,9 +23,10 @@ import java.lang.ref.SoftReference
 
 /**
  * La reconnaissance de l'inventaire filmé, préparée à la première ouverture de la caméra (quelques secondes) :
- * les icônes officielles de l'appli (`assets/objets`, les mêmes que partout ailleurs) servent de références, et
- * les chiffres 0 à 9, dessinés en clair sur fond sombre dans une police sans empattement, de modèles pour lire
- * les nombres. Elle reste prête tant que le téléphone n'a pas besoin de la place.
+ * les icônes officielles de l'appli (`assets/objets`, les mêmes que partout ailleurs) servent de références, avec
+ * la rareté de chaque objet (la couleur du halo de sa case) et combien en tient une case ; les chiffres 0 à 9,
+ * dessinés en clair sur fond sombre avec Barlow (proche de la police des nombres du jeu), servent de modèles pour
+ * lire les nombres. Elle reste prête tant que le téléphone n'a pas besoin de la place.
  */
 object PreparationReconnaissance {
     private val verrou = Mutex()
@@ -30,16 +34,20 @@ object PreparationReconnaissance {
     @Volatile
     private var prete: SoftReference<AnalyseInventaire>? = null
 
-    suspend fun obtenir(contexte: Context, objetIds: List<String>): AnalyseInventaire {
+    suspend fun obtenir(contexte: Context, objets: List<Objet>): AnalyseInventaire {
         prete?.get()?.let { return it }
         return verrou.withLock {
-            prete?.get() ?: withContext(Dispatchers.Default) { construire(contexte.applicationContext, objetIds) }.also { prete = SoftReference(it) }
+            prete?.get() ?: withContext(Dispatchers.Default) { construire(contexte.applicationContext, objets) }.also { prete = SoftReference(it) }
         }
     }
 
-    private fun construire(contexte: Context, objetIds: List<String>): AnalyseInventaire {
-        val icones = objetIds.mapNotNull { id -> icone(contexte, id)?.let { id to it } }.toMap()
-        return AnalyseInventaire(Reconnaisseur(icones), LectureNombre(modelesChiffres()))
+    private fun construire(contexte: Context, objets: List<Objet>): AnalyseInventaire {
+        val icones = objets.mapNotNull { o -> icone(contexte, o.id)?.let { o.id to it } }.toMap()
+        return AnalyseInventaire(
+            Reconnaisseur(icones, objets.associate { it.id to it.rarete }),
+            LectureNombre(modelesChiffres(contexte)),
+            objets.associate { it.id to it.pile },
+        )
     }
 
     private fun icone(contexte: Context, id: String): ImageRgb? {
@@ -51,12 +59,12 @@ object PreparationReconnaissance {
         return versImage(bitmap).also { bitmap.recycle() }
     }
 
-    /** Les chiffres 0 à 9, en blanc gras sur fond sombre. */
-    private fun modelesChiffres(): Map<Int, ImageRgb> {
+    /** Les chiffres 0 à 9, en blanc sur fond sombre, avec la police Barlow de l'appli (proche de celle du jeu). */
+    private fun modelesChiffres(contexte: Context): Map<Int, ImageRgb> {
         val pinceau = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             textSize = 64f
-            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+            typeface = ResourcesCompat.getFont(contexte, R.font.barlow_semibold) ?: Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
             textAlign = Paint.Align.CENTER
         }
         return (0..9).associateWith { chiffre ->

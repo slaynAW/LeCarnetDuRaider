@@ -1,282 +1,305 @@
 package io.github.slaynaw.carnetduraider.core.inventaire
 
 import kotlin.math.abs
-import kotlin.math.ceil
-import kotlin.math.floor
+import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.roundToInt
 
-/** Une case de la grille de l'inventaire : sa [ligne] et sa [colonne] (à partir de 0), et sa zone dans l'image. */
+/** Une case de l'inventaire : sa [ligne] et sa [colonne] (à partir de 0, dans sa grille), et sa zone dans l'image. */
 data class CaseGrille(val ligne: Int, val colonne: Int, val zone: Zone)
 
 /**
- * La grille de l'inventaire dans une image filmée. Les cases sont des carrés réguliers séparés par un fin
- * espace : leurs bords font, colonne après colonne et ligne après ligne, des pics de contraste qui reviennent à
- * pas fixe. Les bords où l'image s'éclaircit et ceux où elle s'assombrit sont suivis à part : le bord d'entrée
- * et le bord de sortie d'une case tombent ainsi dans deux profils différents, même quand l'espace entre deux
- * cases est très fin. On cherche le pas (autocorrélation), puis où tombent les deux familles de bords (la plus
- * longue des deux distances entre elles est l'intérieur d'une case), puis sur quelle étendue ils se répètent.
- * Une première fois avec le contraste cumulé sur toute l'image, puis, dans la seule bande de la grille, avec le
- * contraste médian : un bord de case court tout le long de la grille, le contour d'une icône non (il peut être
- * bien plus fort, mais il ne compte plus).
- * Le téléphone doit être tenu à peu près en face de l'écran : une perspective forte déforme la grille.
+ * Les cases de l'inventaire dans une image filmée. Chaque case a un cadre : un fin trait clair (la couleur de sa
+ * rareté) sur le fond sombre de la grille. On cherche donc des carrés dont les quatre côtés suivent un bord de
+ * l'image presque d'un bout à l'autre (les coins, arrondis, ne comptent pas). Chaque case est trouvée seule : un
+ * écran filmé un peu de biais (téléphone pas tout à fait en face, image un peu tournée) ne gêne pas, tant qu'une
+ * case reste à peu près carrée. Puis seules restent les cases rangées en grille, de même taille et côte à côte
+ * sur une même ligne : les boutons de l'interface (catégories, en-tête), seuls ou en colonne, sont écartés, et
+ * une case à moitié cachée par le bord de la liste aussi (elle n'a pas ses quatre côtés).
  */
 object DetectionGrille {
-    /** Une case fait au moins ce nombre de pixels de côté dans l'image analysée. */
-    private const val PAS_MIN = 12
+    /** La recherche se fait sur une copie dont le grand côté fait au plus ce nombre de pixels. */
+    private const val COTE_TRAVAIL = 800
 
-    /** Il faut voir au moins deux cases dans chaque sens. */
-    private const val CASES_MIN = 2
+    /** Écart de luminance (entre les deux voisins d'un pixel) à partir duquel il y a un bord. */
+    private const val SEUIL_BORD = 18
 
-    /** En dessous, les bords ne se répètent pas assez nettement : ce n'est pas une grille. */
-    private const val SEUIL_PERIODICITE = 0.25
+    /** Un bord compte à ce nombre de pixels près : un écran filmé un peu tourné (jusqu'à 3 degrés environ). */
+    private const val TOLERANCE = 2
 
-    /** Écart de taille toléré entre la largeur et la hauteur d'une case (ce sont des carrés). */
-    private const val ECART_CARRE = 0.3
+    /** Part de chaque côté laissée aux coins, arrondis. */
+    private const val COINS = 0.15
 
-    fun detecter(image: ImageRgb): List<CaseGrille> {
+    /** Part minimale d'un côté qui doit suivre un bord, et moyenne minimale sur les quatre côtés. */
+    private const val COTE_MIN = 0.6
+    private const val COTES_MIN = 0.75
+
+    /** Part maximale d'une ligne juste à l'intérieur du cadre qui suit un bord. */
+    private const val INTERIEUR_MAX = 0.75
+
+    /** Une case fait au moins ce nombre de pixels de côté dans la copie de travail. */
+    private const val CASE_MIN = 18
+
+    /** En dessous de ce nombre de cases trouvées à la taille attendue, toutes les tailles sont essayées. */
+    private const val CASES_SUIVIES = 4
+
+    /** Pas entre deux tailles de case essayées. */
+    private const val PAS_TAILLE = 1.04
+
+    /** Écart de taille toléré entre deux cases d'une même grille. */
+    private const val ECART_TAILLE = 0.15
+
+    /**
+     * Les cases de [image], de haut en bas et de gauche à droite. [tailleAttendue] : la taille des cases de
+     * l'image précédente (en pixels de [image]), pour chercher plus vite autour d'elle.
+     */
+    fun detecter(image: ImageRgb, tailleAttendue: Int? = null): List<CaseGrille> {
+        val facteur = min(1.0, COTE_TRAVAIL.toDouble() / max(image.largeur, image.hauteur))
+        val travail = reduite(image, facteur)
+        val bords = Bords(travail)
+        val cote = min(travail.largeur, travail.hauteur) / 2.0
+        var grille = tailleAttendue?.let { enGrille(chercher(bords, it * facteur * 0.8, it * facteur * 1.25)) }.orEmpty()
+        // Taille inconnue (ou changée : presque rien trouvé autour d'elle) : toutes les tailles.
+        if (grille.size < CASES_SUIVIES) {
+            val toutes = enGrille(chercher(bords, CASE_MIN.toDouble(), cote))
+            if (toutes.size > grille.size) grille = toutes
+        }
+        return grille.map { (ligne, colonne, b) ->
+            CaseGrille(
+                ligne,
+                colonne,
+                Zone(
+                    (b.x / facteur).roundToInt(),
+                    (b.y / facteur).roundToInt(),
+                    max(1, (b.largeur / facteur).roundToInt()),
+                    max(1, (b.hauteur / facteur).roundToInt()),
+                ),
+            )
+        }
+    }
+
+    private fun reduite(image: ImageRgb, facteur: Double): ImageRgb =
+        if (facteur >= 1.0) {
+            image
+        } else {
+            image.echantillon(image.zone, max(1, (image.largeur * facteur).roundToInt()), max(1, (image.hauteur * facteur).roundToInt()))
+        }
+
+    /** Un carré trouvé : sa place, et la part de ses quatre côtés qui suit un bord. */
+    private class Boite(val x: Int, val y: Int, val largeur: Int, val hauteur: Int, val score: Double) {
+        val cx: Double get() = x + largeur / 2.0
+        val cy: Double get() = y + hauteur / 2.0
+    }
+
+    /**
+     * Les bords d'une image : verticaux (l'image change de gauche à droite) et horizontaux, chacun compté à
+     * [TOLERANCE] pixels près (un trait fin n'est jamais pile sur la même colonne d'un bout à l'autre), et leurs
+     * cumuls le long des colonnes et des lignes, pour savoir en un calcul quelle part d'un segment suit un bord.
+     */
+    private class Bords(image: ImageRgb) {
         val l = image.largeur
         val h = image.hauteur
-        if (l < 3 * PAS_MIN || h < 3 * PAS_MIN) return emptyList()
-        val lum = FloatArray(l * h) { ImageRgb.luminance(image.pixels[it]).toFloat() }
-        // Une première fois sur toute l'image, puis sur la seule bande où la grille a été vue dans l'autre sens.
-        val colonnes1 = axe(profilColonnes(lum, l, 1, h - 1, mediane = false)) ?: return emptyList()
-        val lignes1 = axe(profilLignes(lum, l, h, 0, l, mediane = false)) ?: return emptyList()
-        val ys = lignes1.debut.toInt().coerceIn(1, h - 2) to ceil(lignes1.fin).toInt().coerceIn(2, h - 1)
-        val xs = colonnes1.debut.toInt().coerceIn(0, l - 1) to ceil(colonnes1.fin).toInt().coerceIn(1, l)
-        val colonnes = axe(profilColonnes(lum, l, ys.first, ys.second, mediane = true)) ?: colonnes1
-        val lignes = axe(profilLignes(lum, l, h, xs.first, xs.second, mediane = true)) ?: lignes1
-        if (abs(colonnes.pas - lignes.pas) > ECART_CARRE * max(colonnes.pas, lignes.pas)) return emptyList()
-        if (abs(colonnes.taille - lignes.taille) > ECART_CARRE * max(colonnes.taille, lignes.taille)) return emptyList()
-        return (0 until lignes.nombre).flatMap { ligne ->
-            (0 until colonnes.nombre).map { colonne ->
-                val x = colonnes.debut + colonne * colonnes.pas
-                val y = lignes.debut + ligne * lignes.pas
-                CaseGrille(ligne, colonne, Zone(x.roundToInt(), y.roundToInt(), colonnes.taille.roundToInt(), lignes.taille.roundToInt()))
+        private val cumulColonnes = IntArray(l * (h + 1))
+        private val cumulLignes = IntArray((l + 1) * h)
+
+        init {
+            val lum = IntArray(l * h) { ImageRgb.luminance(image.pixels[it]) }
+            val vertical = BooleanArray(l * h)
+            val horizontal = BooleanArray(l * h)
+            for (y in 1 until h - 1) for (x in 1 until l - 1) {
+                val i = y * l + x
+                val gx = abs(lum[i + 1] - lum[i - 1])
+                val gy = abs(lum[i + l] - lum[i - l])
+                if (gx > SEUIL_BORD && gx >= gy) vertical[i] = true
+                if (gy > SEUIL_BORD && gy >= gx) horizontal[i] = true
             }
-        }
-    }
-
-    /** Les cases dans un sens : début de la première, pas d'une case à l'autre, taille d'une case, et combien. */
-    private class Axe(val debut: Double, val pas: Double, val taille: Double, val nombre: Int) {
-        val fin: Double get() = debut + (nombre - 1) * pas + taille
-    }
-
-    /** Les bords dans un sens : où l'image s'éclaircit ([monte]) et où elle s'assombrit ([descend]). */
-    private class Profil(val monte: DoubleArray, val descend: DoubleArray)
-
-    /**
-     * Contraste horizontal de chaque colonne, entre les lignes [y0] et [y1] : les bords verticaux. Cumulé, ou
-     * [mediane] (la valeur du milieu le long de la colonne).
-     */
-    private fun profilColonnes(lum: FloatArray, l: Int, y0: Int, y1: Int, mediane: Boolean): Profil {
-        val monte = DoubleArray(l)
-        val descend = DoubleArray(l)
-        val valeurs = Valeurs()
-        for (x in 1 until l - 1) {
-            valeurs.vider()
-            for (y in y0 until y1) valeurs.ajouter(lum[y * l + x + 1] - lum[y * l + x - 1])
-            monte[x] = valeurs.monte(mediane)
-            descend[x] = valeurs.descend(mediane)
-        }
-        return Profil(monte, descend)
-    }
-
-    /**
-     * Contraste vertical de chaque ligne, entre les colonnes [x0] et [x1] : les bords horizontaux. Cumulé, ou
-     * [mediane] (la valeur du milieu le long de la ligne).
-     */
-    private fun profilLignes(lum: FloatArray, l: Int, h: Int, x0: Int, x1: Int, mediane: Boolean): Profil {
-        val monte = DoubleArray(h)
-        val descend = DoubleArray(h)
-        val valeurs = Valeurs()
-        for (y in 1 until h - 1) {
-            valeurs.vider()
-            for (x in x0 until x1) valeurs.ajouter(lum[(y + 1) * l + x] - lum[(y - 1) * l + x])
-            monte[y] = valeurs.monte(mediane)
-            descend[y] = valeurs.descend(mediane)
-        }
-        return Profil(monte, descend)
-    }
-
-    /** Les écarts de luminance le long d'une ligne ou d'une colonne : leur somme ou leur médiane, par signe. */
-    private class Valeurs {
-        private val histoMonte = IntArray(256)
-        private val histoDescend = IntArray(256)
-        private var sommeMonte = 0.0
-        private var sommeDescend = 0.0
-        private var n = 0
-
-        fun vider() {
-            histoMonte.fill(0)
-            histoDescend.fill(0)
-            sommeMonte = 0.0
-            sommeDescend = 0.0
-            n = 0
-        }
-
-        fun ajouter(d: Float) {
-            n++
-            val v = d.toInt().coerceIn(-255, 255)
-            if (d > 0) {
-                sommeMonte += d
-                histoMonte[v]++
-                histoDescend[0]++
-            } else {
-                sommeDescend -= d
-                histoDescend[-v]++
-                histoMonte[0]++
+            for (x in 0 until l) {
+                val x0 = max(0, x - TOLERANCE)
+                val x1 = min(l - 1, x + TOLERANCE)
+                for (y in 0 until h) {
+                    val i = y * l + x
+                    var bord = false
+                    for (xx in x0..x1) if (vertical[y * l + xx]) {
+                        bord = true
+                        break
+                    }
+                    cumulColonnes[i + l] = cumulColonnes[i] + if (bord) 1 else 0
+                }
+            }
+            for (y in 0 until h) {
+                val y0 = max(0, y - TOLERANCE)
+                val y1 = min(h - 1, y + TOLERANCE)
+                for (x in 0 until l) {
+                    var bord = false
+                    for (yy in y0..y1) if (horizontal[yy * l + x]) {
+                        bord = true
+                        break
+                    }
+                    cumulLignes[y * (l + 1) + x + 1] = cumulLignes[y * (l + 1) + x] + if (bord) 1 else 0
+                }
             }
         }
 
-        fun monte(mediane: Boolean): Double = if (mediane) milieu(histoMonte) else sommeMonte
-        fun descend(mediane: Boolean): Double = if (mediane) milieu(histoDescend) else sommeDescend
+        /** Part de la colonne [x], de la ligne [y0] à [y1] (exclue), qui suit un bord vertical. */
+        fun colonne(x: Int, y0: Int, y1: Int): Double = (cumulColonnes[y1 * l + x] - cumulColonnes[y0 * l + x]).toDouble() / (y1 - y0)
 
-        private fun milieu(histo: IntArray): Double {
-            var cumul = 0
-            for (v in 0 until 256) {
-                cumul += histo[v]
-                if (2 * cumul >= n) return v.toDouble()
-            }
-            return 0.0
-        }
+        /** Part de la ligne [y], de la colonne [x0] à [x1] (exclue), qui suit un bord horizontal. */
+        fun ligne(y: Int, x0: Int, x1: Int): Double = (cumulLignes[y * (l + 1) + x1] - cumulLignes[y * (l + 1) + x0]).toDouble() / (x1 - x0)
     }
 
-    private fun axe(profil: Profil): Axe? {
-        val n = profil.monte.size
-        val pasMax = n / CASES_MIN
-        if (pasMax <= PAS_MIN + 2) return null
-        val monte = pics(profil.monte)
-        val descend = pics(profil.descend)
-
-        // Le pas : le premier pic de l'autocorrélation (des deux familles de bords) presque aussi haut que le plus
-        // haut. Chaque famille n'a qu'un bord par case : seuls le pas et ses multiples ressortent.
-        val auto = DoubleArray(pasMax + 2)
-        val am = autocorrelation(monte, pasMax + 1)
-        val ad = autocorrelation(descend, pasMax + 1)
-        for (k in auto.indices) auto[k] = (am[k] + ad[k]) / 2
-        val maxima = (PAS_MIN..min(pasMax, n - 3)).filter { auto[it] > 0 && auto[it] >= auto[it - 1] && auto[it] >= auto[it + 1] }
-        val plusHaut = maxima.maxOfOrNull { auto[it] } ?: return null
-        if (plusHaut < SEUIL_PERIODICITE) return null
-        val k = maxima.first { auto[it] >= 0.7 * plusHaut }
-        val courbure = auto[k - 1] - 2 * auto[k] + auto[k + 1]
-        val pas = k + if (abs(courbure) > 1e-12) (0.5 * (auto[k - 1] - auto[k + 1]) / courbure).coerceIn(-0.5, 0.5) else 0.0
-
-        // Où tombent les bords de chaque famille : le peigne (une dent par pas) qui accroche le plus de contraste.
-        val (bordMonte, forceMonte) = phase(monte, pas)
-        val (bordDescend, forceDescend) = phase(descend, pas)
-        // Un bord tombe entre deux pixels : le contraste culmine un demi-pixel avant le début de la case.
-        val (debutCase, taille) = if (min(forceMonte, forceDescend) < 0.08 * max(forceMonte, forceDescend)) {
-            // Une seule famille nette : des cases jointives, de bord à bord.
-            val bord = if (forceMonte >= forceDescend) bordMonte else bordDescend
-            (bord + 1.5) to (pas - 2)
-        } else {
-            val d = ((bordDescend - bordMonte) % pas + pas) % pas
-            // Le plus long des deux intervalles entre les deux familles de bords est l'intérieur d'une case.
-            if (d >= pas - d) (bordMonte + 0.5) to d else (bordDescend + 0.5) to (pas - d)
-        }
-
-        // Jusqu'où la grille s'étend : la plus longue suite de cases dont les deux bords se voient bien.
-        var position = debutCase - floor(debutCase / pas) * pas
-        val positions = mutableListOf<Double>()
-        while (position + taille <= n - 1) {
-            positions += position
-            position += pas
-        }
-        if (positions.size < CASES_MIN) return null
-        val appuis = positions.map { pic(monte, it - 0.5) + pic(descend, it - 0.5) + pic(monte, it + taille - 0.5) + pic(descend, it + taille - 0.5) }
-        val seuil = 0.3 * (appuis.maxOrNull() ?: 0.0)
-        var meilleurDebut = 0
-        var meilleureLongueur = 0
-        var debutSuite = 0
-        for (i in positions.indices) {
-            if (appuis[i] < seuil) {
-                debutSuite = i + 1
-                continue
-            }
-            val longueur = i - debutSuite + 1
-            if (longueur > meilleureLongueur) {
-                meilleureLongueur = longueur
-                meilleurDebut = debutSuite
+    /** Les carrés de [tailleMin] à [tailleMax] pixels de côté dont les quatre côtés suivent un bord ; un seul par endroit. */
+    private fun chercher(bords: Bords, tailleMin: Double, tailleMax: Double): List<Boite> {
+        val l = bords.l
+        val h = bords.h
+        val haut = min(tailleMax, min(l, h) / 2.0)
+        val bas = max(CASE_MIN * 0.5, tailleMin)
+        if (haut < bas) return emptyList()
+        val trouvees = mutableListOf<Boite>()
+        val nombre = (ln(haut / bas) / ln(PAS_TAILLE)).toInt() + 1
+        var precedente = -1
+        for (k in 0 until nombre) {
+            val c = (bas * PAS_TAILLE.pow(k)).roundToInt()
+            if (c == precedente || c < 8) continue
+            precedente = c
+            val a = (c * COINS).roundToInt()
+            for (y in 0 until h - c) for (x in 0 until l - c) {
+                val gauche = bords.colonne(x, y + a, y + c - a)
+                if (gauche < COTE_MIN) continue
+                val droite = bords.colonne(x + c - 1, y + a, y + c - a)
+                if (droite < COTE_MIN) continue
+                val dessus = bords.ligne(y, x + a, x + c - a)
+                if (dessus < COTE_MIN) continue
+                val dessous = bords.ligne(y + c - 1, x + a, x + c - a)
+                if (dessous < COTE_MIN) continue
+                val score = (gauche + droite + dessus + dessous) / 4
+                if (score < COTES_MIN) continue
+                // Juste à l'intérieur du cadre, le fond de la case est calme : ni un bord partout (du bruit), ni un
+                // second cadre le long d'un côté (ce carré-là englobe la case et l'espace qui la sépare de ses
+                // voisines, dont il suit les cadres).
+                val d = max(TOLERANCE + 2, c / 10)
+                val dedans = maxOf(
+                    bords.colonne(x + d, y + a, y + c - a),
+                    bords.colonne(x + c - 1 - d, y + a, y + c - a),
+                    bords.ligne(y + d, x + a, x + c - a),
+                    bords.ligne(y + c - 1 - d, x + a, x + c - a),
+                )
+                if (dedans > INTERIEUR_MAX) continue
+                // Ni deux cadres en croix au milieu, l'un vertical, l'autre horizontal : ce carré-là couvre quatre
+                // cases (un bloc de deux sur deux, dans une image floue où les cases elles-mêmes se voient mal).
+                val m = (c * 0.08).roundToInt()
+                val vertical = (c / 2 - m..c / 2 + m).maxOf { j -> bords.colonne(x + j, y + a, y + c - a) }
+                val horizontal = (c / 2 - m..c / 2 + m).maxOf { j -> bords.ligne(y + j, x + a, x + c - a) }
+                if (min(vertical, horizontal) <= INTERIEUR_MAX) trouvees += Boite(x, y, c, c, score)
             }
         }
-        if (meilleureLongueur < CASES_MIN) return null
-        return Axe(positions[meilleurDebut], pas, taille, meilleureLongueur)
+        // Les meilleures d'abord ; à égalité, la plus petite : une case plutôt que la case et l'espace qui la sépare
+        // de ses voisines (ce carré-là aussi a ses quatre côtés sur des bords, ceux des cases voisines).
+        val gardees = mutableListOf<Boite>()
+        for (b in trouvees.sortedWith(compareByDescending<Boite> { it.score }.thenBy { it.largeur })) {
+            if (gardees.none { conflit(it, b) }) gardees += affinee(bords, b)
+        }
+        return gardees
     }
 
-    /** Seuls comptent les pics : le profil moins sa moyenne locale (les variations lentes de lumière s'effacent). */
-    private fun pics(profil: DoubleArray): DoubleArray {
-        val n = profil.size
-        val cumul = DoubleArray(n + 1)
-        for (i in 0 until n) cumul[i + 1] = cumul[i] + profil[i]
-        return DoubleArray(n) { i ->
-            val a = max(0, i - PAS_MIN)
-            val b = min(n, i + PAS_MIN + 1)
-            max(0.0, profil[i] - (cumul[b] - cumul[a]) / (b - a))
-        }
+    /** Chaque côté recalé à deux pixels près sur le bord le plus net (un écran filmé de biais : cases pas tout à fait carrées). */
+    private fun affinee(bords: Bords, b: Boite): Boite {
+        val a = (b.largeur * COINS).roundToInt()
+        fun meilleur(depart: Int, limite: Int, part: (Int) -> Double): Int =
+            (depart - 2..depart + 2).filter { it in 0 until limite }.maxByOrNull { part(it) - abs(it - depart) * 0.01 } ?: depart
+        val y0 = b.y + a
+        val y1 = b.y + b.hauteur - a
+        val x0 = b.x + a
+        val x1 = b.x + b.largeur - a
+        val gauche = meilleur(b.x, bords.l) { bords.colonne(it, y0, y1) }
+        val droite = meilleur(b.x + b.largeur - 1, bords.l) { bords.colonne(it, y0, y1) }
+        val dessus = meilleur(b.y, bords.h) { bords.ligne(it, x0, x1) }
+        val dessous = meilleur(b.y + b.hauteur - 1, bords.h) { bords.ligne(it, x0, x1) }
+        if (droite - gauche < 8 || dessous - dessus < 8) return b
+        return Boite(gauche, dessus, droite - gauche + 1, dessous - dessus + 1, b.score)
+    }
+
+    /** Part commune de deux carrés, rapportée au plus petit. */
+    private fun recouvrement(a: Boite, b: Boite): Double {
+        val ix = max(0, min(a.x + a.largeur, b.x + b.largeur) - max(a.x, b.x))
+        val iy = max(0, min(a.y + a.hauteur, b.y + b.hauteur) - max(a.y, b.y))
+        return ix.toDouble() * iy / min(a.largeur * a.hauteur, b.largeur * b.hauteur)
     }
 
     /**
-     * Autocorrélation de [pics], centrée et normée (de -1 à 1) jusqu'au décalage [kMax] : proche de 0 pour du
-     * bruit, forte au pas d'une grille.
+     * Deux carrés de taille voisine qui se recouvrent : un seul est une case (la même case trouvée deux fois, ou
+     * décalée d'une demi-case). Un petit carré dans une case (le dessin d'une icône) ne la fait pas disparaître.
      */
-    private fun autocorrelation(pics: DoubleArray, kMax: Int): DoubleArray {
-        val n = pics.size
-        val moyenne = pics.average()
-        val c = DoubleArray(n) { pics[it] - moyenne }
-        val variance = c.sumOf { it * it } / n
-        val auto = DoubleArray(kMax + 1)
-        if (variance <= 1e-9) return auto
-        for (k in 1..min(kMax, n - 2)) {
-            var s = 0.0
-            for (x in 0 until n - k) s += c[x] * c[x + k]
-            auto[k] = s / (n - k) / variance
-        }
-        return auto
+    private fun conflit(a: Boite, b: Boite): Boolean {
+        val petite = min(a.largeur * a.hauteur, b.largeur * b.hauteur).toDouble()
+        val grande = max(a.largeur * a.hauteur, b.largeur * b.hauteur).toDouble()
+        return recouvrement(a, b) > 0.3 && petite >= 0.5 * grande
     }
 
-    /** Le départ du peigne de pas [pas] qui accroche le plus de contraste, et sa force moyenne par dent. */
-    private fun phase(pics: DoubleArray, pas: Double): Pair<Double, Double> {
-        var meilleur = 0.0
-        var force = -1.0
-        var depart = 0.0
-        while (depart < pas) {
-            var s = 0.0
-            var dents = 0
-            var x = depart
-            while (x < pics.size - 1) {
-                s += pic(pics, x)
-                dents++
-                x += pas
-            }
-            val f = if (dents == 0) 0.0 else s / dents
-            if (f > force) {
-                force = f
-                meilleur = depart
-            }
-            depart += 0.5
+    /**
+     * Les carrés rangés en grille : de même taille, voisins d'un pas (un peu plus d'une case) à gauche, à droite,
+     * en haut ou en bas. Un groupe de voisins n'est gardé que s'il a au moins deux cases côte à côte sur une même
+     * ligne (une colonne de boutons ne compte pas). Chaque case reçoit sa ligne et sa colonne dans son groupe.
+     */
+    private fun enGrille(boites: List<Boite>): List<Triple<Int, Int, Boite>> {
+        val n = boites.size
+        val parent = IntArray(n) { it }
+        fun racine(i: Int): Int {
+            var r = i
+            while (parent[r] != r) r = parent[r]
+            return r
         }
-        // Affinage au-delà du demi-pixel : le centre du contraste autour de chaque dent.
-        var decalage = 0.0
-        var poids = 0.0
-        var x = meilleur
-        while (x < pics.size - 1) {
-            for (i in max(0, floor(x - 3).toInt())..min(pics.size - 1, ceil(x + 3).toInt())) {
-                decalage += (i - x) * pics[i]
-                poids += pics[i]
+        val coteACote = BooleanArray(n)
+        for (i in 0 until n) for (j in i + 1 until n) {
+            val a = boites[i]
+            val b = boites[j]
+            val taille = max(a.largeur, b.largeur).toDouble()
+            if (abs(a.largeur - b.largeur) > ECART_TAILLE * taille) continue
+            val dx = abs(a.cx - b.cx)
+            val dy = abs(a.cy - b.cy)
+            val horizontal = dx in 0.95 * taille..1.45 * taille && dy <= 0.35 * taille
+            val vertical = dy in 0.95 * taille..1.45 * taille && dx <= 0.35 * taille
+            if (horizontal || vertical) parent[racine(i)] = racine(j)
+            if (horizontal) {
+                coteACote[i] = true
+                coteACote[j] = true
             }
-            x += pas
         }
-        return (if (poids > 0) meilleur + decalage / poids else meilleur) to force
+        val grilles = (0 until n).groupBy { racine(it) }.values.filter { g -> g.count { coteACote[it] } >= 2 }
+        // La grille principale (la plus fournie), et celles de même taille à côté (le sac à dos à côté de la
+        // réserve) ; des boutons alignés, plus petits ou plus grands, ne comptent pas.
+        val principale = grilles.maxWithOrNull(compareBy({ it.size }, { g -> g.sumOf { boites[it].largeur } })) ?: return emptyList()
+        val taillePrincipale = mediane(principale.map { boites[it].largeur.toDouble() }) ?: return emptyList()
+        val groupes = grilles.filter { g ->
+            val t = mediane(g.map { boites[it].largeur.toDouble() }) ?: 0.0
+            g === principale || (
+                t in 0.8 * taillePrincipale..1.25 * taillePrincipale &&
+                    g.none { i -> principale.any { j -> recouvrement(boites[i], boites[j]) > 0.1 } }
+                )
+        }
+        return groupes
+            .sortedWith(compareBy({ g -> g.minOf { boites[it].y } }, { g -> g.minOf { boites[it].x } }))
+            .flatMap { g ->
+                val taille = mediane(g.map { boites[it].largeur.toDouble() }) ?: 1.0
+                val lignes = rangs(g.map { boites[it].cy }, taille)
+                val colonnes = rangs(g.map { boites[it].cx }, taille)
+                g.indices.map { k -> Triple(lignes[k], colonnes[k], boites[g[k]]) }
+                    .sortedWith(compareBy({ it.first }, { it.second }))
+            }
     }
 
-    /** Le plus fort du profil à moins de 1,5 pixel de [x] : un bord n'est jamais pile sur un pixel. */
-    private fun pic(pics: DoubleArray, x: Double): Double {
-        val a = max(0, (x - 1.5).roundToInt())
-        val b = min(pics.size - 1, (x + 1.5).roundToInt())
-        var m = 0.0
-        for (i in a..b) m = max(m, pics[i])
-        return m
+    /** Le rang de chaque valeur : une nouvelle ligne (ou colonne) commence à plus d'une demi-case de la précédente. */
+    private fun rangs(valeurs: List<Double>, taille: Double): List<Int> {
+        val ordre = valeurs.indices.sortedBy { valeurs[it] }
+        val rang = IntArray(valeurs.size)
+        var r = 0
+        for (k in ordre.indices) {
+            if (k > 0 && valeurs[ordre[k]] - valeurs[ordre[k - 1]] > taille / 2) r++
+            rang[ordre[k]] = r
+        }
+        return rang.toList()
     }
+
+    private fun mediane(valeurs: List<Double>): Double? = valeurs.sorted().let { if (it.isEmpty()) null else it[it.size / 2] }
 }

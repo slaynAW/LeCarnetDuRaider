@@ -1,5 +1,6 @@
 package io.github.slaynaw.carnetduraider.core.inventaire
 
+import io.github.slaynaw.carnetduraider.core.Rarete
 import io.github.slaynaw.carnetduraider.core.inventaire.ImagesDeTest.CaseTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
@@ -8,112 +9,170 @@ import org.junit.jupiter.api.Test
 import kotlin.math.abs
 import kotlin.random.Random
 
-/** Grille, reconnaissance des icônes et lecture des nombres, sur des écrans d'inventaire synthétiques filmés. */
+/**
+ * Cases, rareté, reconnaissance des icônes et lecture de la bande du bas, sur des écrans d'inventaire
+ * synthétiques dessinés à la manière du jeu et filmés de biais.
+ */
 class ReconnaissanceTest {
-    private val icones = (0 until 40).associate { "objet_$it" to ImagesDeTest.icone(it) }
-    private val reconnaisseur = Reconnaisseur(icones)
+    /** 40 objets, de raretés variées ; « arme_i » et « arme_ii » partagent la même icône (deux niveaux). */
+    private val raretesTest = (0 until 40).associate { "objet_$it" to Rarete.entries[it % Rarete.entries.size] }
+    private val icones = (0 until 40).associate { "objet_$it" to ImagesDeTest.icone(it) } +
+        mapOf("arme_i" to ImagesDeTest.icone(77), "arme_ii" to ImagesDeTest.icone(77))
+    private val raretes: Map<String, Rarete?> = raretesTest + mapOf("arme_i" to Rarete.RARE, "arme_ii" to Rarete.RARE)
+    private val piles = icones.keys.associateWith { if (it.startsWith("arme")) 1 else 200 }
+    private val reconnaisseur = Reconnaisseur(icones, raretes)
     private val nombres = LectureNombre(ImagesDeTest.modelesChiffres())
-    private val analyse = AnalyseInventaire(reconnaisseur, nombres)
 
-    /** 6 × 4 cases : des piles, des objets seuls, deux cases vides et un reflet. */
+    private fun analyse() = AnalyseInventaire(reconnaisseur, nombres, piles)
+
+    /** Les icônes de test par graine : 77 pour l'arme. */
+    private fun rarete(graine: Int): Rarete = if (graine == 77) Rarete.RARE else Rarete.entries[graine % Rarete.entries.size]
+
+    private fun case(graine: Int?, quantite: Int = 1, niveau: Int? = null, reflet: Boolean = false) =
+        CaseTest(graine, quantite, if (graine == null) Rarete.COMMUN else rarete(graine), niveau, reflet)
+
+    /** 4 × 6 cases : des piles, des objets seuls, une arme à deux niveaux, une case vide et un reflet. */
     private val inventaire = listOf(
-        CaseTest(3), CaseTest(11, 8), CaseTest(7), CaseTest(25), CaseTest(31), CaseTest(14, 12),
-        CaseTest(5, 3), CaseTest(18, 2), CaseTest(22), CaseTest(9, 3), CaseTest(36), CaseTest(1),
-        CaseTest(28), CaseTest(16, 2), CaseTest(30, reflet = true), CaseTest(12, 2), CaseTest(39), CaseTest(20, 6),
-        CaseTest(33, 4), CaseTest(2), CaseTest(null), CaseTest(null), CaseTest(27, 47), CaseTest(8, 105),
+        case(3), case(11, 8), case(7), case(25, 24),
+        case(31), case(14, 12), case(5, 3), case(18, 2),
+        case(22), case(9, 3), case(77, niveau = 2), case(1),
+        case(28), case(16, 2), case(30, reflet = true), case(12, 60),
+        case(39), case(20, 6), case(33, 4), case(2),
+        case(null), case(77, niveau = 1), case(27, 47), case(8, 105),
     )
 
+    /** La même case, à quelques pixels près : centres à moins de 5 pixels, côtés à moins de 12 % (le cadre a une épaisseur). */
+    private fun proches(a: Zone, b: Zone): Boolean =
+        abs((a.x + a.droite) - (b.x + b.droite)) <= 10 && abs((a.y + a.bas) - (b.y + b.bas)) <= 10 &&
+            abs(a.largeur - b.largeur) <= 0.12 * b.largeur && abs(a.hauteur - b.hauteur) <= 0.12 * b.hauteur
+
     @Test
-    fun `la grille de l'inventaire est retrouvee`() {
-        val ecran = ImagesDeTest.ecran(inventaire)
-        val cases = DetectionGrille.detecter(ecran.image)
-        assertEquals(24, cases.size)
-        assertEquals(4, cases.maxOf { it.ligne } + 1)
-        assertEquals(6, cases.maxOf { it.colonne } + 1)
-        for (c in cases) {
-            val attendue = ecran.zones[c.ligne * 6 + c.colonne]
-            assertTrue(abs(c.zone.x - attendue.x) <= 3 && abs(c.zone.y - attendue.y) <= 3, "case ${c.ligne},${c.colonne} : ${c.zone} au lieu de $attendue")
-            assertTrue(abs(c.zone.largeur - attendue.largeur) <= 4, "taille ${c.zone.largeur} au lieu de ${attendue.largeur}")
+    fun `les cases sont retrouvees par leur cadre, meme filmees un peu de biais`() {
+        for (angle in listOf(0.0, 2.5)) {
+            val ecran = ImagesDeTest.ecran(inventaire, angle = angle)
+            val cases = DetectionGrille.detecter(ecran.image)
+            assertEquals(24, cases.size, "angle $angle")
+            for (z in ecran.zones) assertTrue(cases.any { proches(it.zone, z) }, "case $z trouvée (angle $angle)")
+            assertEquals(6, cases.maxOf { it.ligne } + 1)
+            assertEquals(4, cases.maxOf { it.colonne } + 1)
         }
     }
 
     @Test
-    fun `la grille est retrouvee a une autre taille et un autre endroit`() {
-        val ecran = ImagesDeTest.ecran(inventaire.take(12), colonnes = 4, x0 = 120, y0 = 30, cote = 50, pas = 55, graine = 7)
+    fun `les cases sont retrouvees a une autre taille, et plus vite avec la taille de l'image precedente`() {
+        val ecran = ImagesDeTest.ecran(inventaire.take(12), colonnes = 3, largeur = 400, hauteur = 360, x0 = 50, y0 = 40, cote = 70, pas = 75)
         val cases = DetectionGrille.detecter(ecran.image)
         assertEquals(12, cases.size)
-        val premiere = cases.first { it.ligne == 0 && it.colonne == 0 }
-        assertTrue(abs(premiere.zone.x - 120) <= 3 && abs(premiere.zone.y - 30) <= 3, "première case : ${premiere.zone}")
+        assertEquals(12, DetectionGrille.detecter(ecran.image, tailleAttendue = 70).size)
+        // Une taille attendue fausse ne fait rien manquer : toutes les tailles sont alors essayées.
+        assertEquals(12, DetectionGrille.detecter(ecran.image, tailleAttendue = 30).size)
     }
 
     @Test
-    fun `pas de grille dans une image sans inventaire`() {
-        val alea = Random(5)
-        val bruit = ImageRgb(400, 300, IntArray(400 * 300) { ImageRgb.argb(255, 40 + alea.nextInt(30), 40 + alea.nextInt(30), 45 + alea.nextInt(30)) })
+    fun `les boutons de l'interface, en colonne, ne sont pas des cases`() {
+        val ecran = ImagesDeTest.ecran(inventaire, boutons = true)
+        val cases = DetectionGrille.detecter(ecran.image)
+        assertEquals(24, cases.size)
+        assertTrue(cases.all { c -> ecran.zones.any { proches(c.zone, it) } })
+    }
+
+    @Test
+    fun `pas de case dans une image sans inventaire`() {
+        val alea = Random(4)
+        val bruit = ImageRgb(320, 240, IntArray(320 * 240) { ImageRgb.argb(255, alea.nextInt(256), alea.nextInt(256), alea.nextInt(256)) })
         assertTrue(DetectionGrille.detecter(bruit).isEmpty())
-        assertTrue(analyse.analyser(bruit).isEmpty())
+        val unie = ImageRgb(320, 240, IntArray(320 * 240) { ImageRgb.argb(255, 40, 42, 50) })
+        assertTrue(DetectionGrille.detecter(unie).isEmpty())
     }
 
     @Test
-    fun `chaque objet est reconnu avec son nombre, les cases vides sont ignorees`() {
-        val ecran = ImagesDeTest.ecran(inventaire)
-        val vues = analyse.analyser(ecran.image)
-        assertEquals(22, vues.size, "les deux cases vides ne comptent pas")
-        for (vue in vues) {
-            val k = ecran.zones.indexOfFirst { abs(it.x - vue.zone.x) <= 4 && abs(it.y - vue.zone.y) <= 4 }
-            assertTrue(k >= 0, "case inattendue ${vue.zone}")
-            val attendue = ecran.cases[k]
-            val contenu = vue.contenu
-            if (attendue.reflet) {
-                // Sous un reflet : pas sûr, ou bien reconnu, mais jamais pris pour un autre objet.
-                assertTrue(contenu == ContenuCase.PasSur || (contenu as ContenuCase.Objet).objetIds == listOf("objet_${attendue.graine}"), "reflet : $contenu")
-                continue
+    fun `la rarete se lit sur le halo de la case`() {
+        val cases = Rarete.entries.map { CaseTest(3, rarete = it) }
+        val ecran = ImagesDeTest.ecran(cases, colonnes = 5, largeur = 640, hauteur = 300, x0 = 40, y0 = 60)
+        for ((k, z) in ecran.zones.withIndex()) assertEquals(Rarete.entries[k], HaloRarete.lire(ecran.image, z))
+    }
+
+    @Test
+    fun `chaque objet est reconnu, son nombre est juste ou illisible, jamais faux, et les cases vides sont ignorees`() {
+        val ecran = ImagesDeTest.ecran(inventaire, angle = 1.5)
+        val vues = analyse().analyser(ecran.image)
+        var piles = 0
+        var lues = 0
+        for ((k, attendu) in ecran.cases.withIndex()) {
+            val zone = ecran.zones[k]
+            val vue = vues.firstOrNull { proches(it.zone, zone) }
+            val g = attendu.graine
+            when {
+                g == null -> assertNull(vue, "case vide $k")
+                attendu.reflet -> assertTrue(vue == null || vue.contenu == ContenuCase.PasSur, "reflet $k : jamais un objet sûr")
+                g == 77 -> {
+                    val objet = vue?.contenu as? ContenuCase.Objet
+                    assertEquals(listOf(if (attendu.niveau == 2) "arme_ii" else "arme_i"), objet?.objetIds, "case $k : le niveau lu choisit l'arme")
+                    assertEquals(1, objet?.quantite, "case $k : une arme ne s'empile pas")
+                }
+                else -> {
+                    val objet = vue?.contenu as? ContenuCase.Objet
+                    assertEquals(listOf("objet_$g"), objet?.objetIds, "case $k")
+                    val q = objet?.quantite
+                    assertTrue(q == null || q == attendu.quantite, "case $k : nombre $q, jamais faux (${attendu.quantite})")
+                    if (attendu.quantite > 1) {
+                        piles++
+                        if (q == attendu.quantite) lues++
+                    }
+                }
             }
-            assertTrue(contenu is ContenuCase.Objet, "case $k (objet_${attendue.graine}) : $contenu")
-            contenu as ContenuCase.Objet
-            assertEquals(listOf("objet_${attendue.graine}"), contenu.objetIds, "case $k")
-            assertEquals(attendue.quantite, contenu.quantite, "nombre de la case $k")
         }
+        // Une image filmée un peu de biais : presque tous les nombres se lisent (les autres, sur l'image suivante).
+        assertTrue(lues >= piles * 8 / 10, "$lues nombres lus sur $piles")
     }
 
     @Test
-    fun `une icone inconnue n'est jamais reconnue surement`() {
-        // L'objet 30 n'est pas dans les icônes connues : sa case ne doit pas passer pour un autre.
-        val connues = Reconnaisseur(icones - "objet_30")
-        val ecran = ImagesDeTest.ecran(listOf(CaseTest(30), CaseTest(3), CaseTest(30), CaseTest(7)), colonnes = 2, largeur = 300, hauteur = 260)
-        val vues = AnalyseInventaire(connues, nombres).analyser(ecran.image)
-        assertEquals(4, vues.size)
-        val inconnues = vues.filterIndexed { i, _ -> i % 2 == 0 }
-        assertTrue(inconnues.all { it.contenu == ContenuCase.PasSur }, "${inconnues.map { it.contenu }}")
+    fun `une icone inconnue n'est jamais reconnue comme un objet`() {
+        val inconnue = ImagesDeTest.icone(1234)
+        val cases = listOf(CaseTest(1234), case(3), case(7), case(11))
+        val ecran = ImagesDeTest.ecran(cases, colonnes = 4, largeur = 560, hauteur = 260, x0 = 60, y0 = 60) { if (it == 1234) inconnue else ImagesDeTest.icone(it) }
+        val vues = analyse().analyser(ecran.image)
+        assertTrue(vues.none { proches(it.zone, ecran.zones[0]) && it.contenu is ContenuCase.Objet })
+        assertEquals(3, vues.count { it.contenu is ContenuCase.Objet })
     }
 
     @Test
     fun `deux objets a la meme icone n'en font qu'un, avec leurs deux identifiants`() {
-        val jumeaux = Reconnaisseur(mapOf("a" to ImagesDeTest.icone(4), "b" to ImagesDeTest.icone(4), "c" to ImagesDeTest.icone(6)))
-        assertEquals(2, jumeaux.taille)
-        val ecran = ImagesDeTest.ecran(listOf(CaseTest(4), CaseTest(6), CaseTest(6), CaseTest(4)), colonnes = 2, largeur = 300, hauteur = 260)
-        val vues = AnalyseInventaire(jumeaux, nombres).analyser(ecran.image)
-        assertEquals(listOf("a", "b"), (vues.first().contenu as ContenuCase.Objet).objetIds)
+        val ecran = ImagesDeTest.ecran(listOf(case(77), case(3)), colonnes = 2, largeur = 340, hauteur = 240, x0 = 60, y0 = 60)
+        val r = reconnaisseur.reconnaitre(ecran.image, ecran.zones[0], Rarete.RARE)
+        assertTrue(r.sur)
+        assertEquals(listOf("arme_i", "arme_ii"), r.objetIds)
+        assertEquals(listOf("arme_ii"), AnalyseInventaire.auNiveau(r.objetIds, 2))
+        assertEquals(listOf("arme_i", "arme_ii"), AnalyseInventaire.auNiveau(r.objetIds, null))
     }
 
     @Test
-    fun `nombres lus dans le coin de la case, 1 quand il n'y en a pas`() {
-        val zone = Zone(10, 10, 72, 72)
-        for (n in listOf(2, 7, 12, 30, 98, 450)) {
-            val image = ImageRgb(100, 100, IntArray(100 * 100) { ImageRgb.argb(255, 32, 34, 40) })
-            ImagesDeTest.ecrireNombre(image, zone, n)
-            assertEquals(n, nombres.lire(ImagesDeTest.filmer(image, Random(n)), zone), "nombre $n")
-        }
-        val sans = ImageRgb(100, 100, IntArray(100 * 100) { ImageRgb.argb(255, 32, 34, 40) })
-        assertEquals(1, nombres.lire(sans, zone))
+    fun `les variantes d'un objet sont de la meme famille`() {
+        assertEquals("anvil", Reconnaisseur.famille("anvil_iv"))
+        assertEquals("looting_mk3", Reconnaisseur.famille("looting_mk3_cautious"))
+        assertNull(Reconnaisseur.famille("light_ammo"))
+        assertNull(Reconnaisseur.famille("looting_mk2"))
     }
 
     @Test
-    fun `un chiffre qui ne ressemble a aucun modele rend le nombre illisible`() {
-        val zone = Zone(10, 10, 72, 72)
-        val image = ImageRgb(100, 100, IntArray(100 * 100) { ImageRgb.argb(255, 32, 34, 40) })
-        // Un pavé clair à la place du nombre.
-        for (y in 64 until 78) for (x in 66 until 76) image.pixels[y * 100 + x] = ImageRgb.argb(255, 250, 250, 250)
-        assertNull(nombres.lire(image, zone))
+    fun `la bande du bas - le nombre apres le signe fois, rien d'ecrit - un, le niveau en chiffres romains`() {
+        val cases = listOf(case(3, 24), case(7), case(11, 105), case(77, niveau = 3), case(14, 9), case(5, 60))
+        val ecran = ImagesDeTest.ecran(cases, colonnes = 3, largeur = 440, hauteur = 340, x0 = 50, y0 = 50, angle = 1.0)
+        val lu = ecran.zones.map { nombres.lire(ecran.image, it) }
+        assertEquals(Bande(24), lu[0])
+        assertEquals(Bande(1), lu[1])
+        assertEquals(Bande(105), lu[2])
+        assertEquals(Bande(1, 3), lu[3])
+        assertEquals(Bande(9), lu[4])
+        assertEquals(Bande(60), lu[5])
+    }
+
+    @Test
+    fun `un nombre qui ne ressemble a aucun modele est illisible`() {
+        // Des modèles de chiffres tous identiques : aucun chiffre ne l'emporte nettement.
+        val flous = LectureNombre((0..9).associateWith { ImagesDeTest.modelesChiffres().getValue(8) })
+        val ecran = ImagesDeTest.ecran(listOf(case(3, 24), case(7)), colonnes = 2, largeur = 340, hauteur = 240, x0 = 60, y0 = 60)
+        assertNull(flous.lire(ecran.image, ecran.zones[0]).quantite)
+        assertEquals(1, flous.lire(ecran.image, ecran.zones[1]).quantite)
     }
 }

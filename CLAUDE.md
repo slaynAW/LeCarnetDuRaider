@@ -160,15 +160,21 @@ guillemets `« … »`. Apostrophe droite `'` acceptée dans le code.
   Objets (`BoutonFilmerInventaire`) ; caméra en direct (CameraX, autorisation Caméra demandée à la première
   ouverture), une étiquette sur chaque case reconnue (VENDS, VENDS n, RECYCLE, GARDE, BUILD, « ? »), et dessous la
   liste « À vendre » qui se remplit avec son total ; « Terminé » ouvre la liste complète (à garder par objectif
-  puis par build). Reconnaissance sur le téléphone, jamais en ligne : grille des cases (`DetectionGrille` : bords
-  qui reviennent à pas fixe, téléphone en face de l'écran), icône comparée aux icônes officielles de l'appli
-  (`Reconnaisseur` : sous le détourage, puis posée sur le fond de la case ; « sûr » seulement au-dessus d'un seuil
-  et nettement devant la suivante, sinon « Pas sûr », jamais compté à vendre), nombre lu dans le coin de la case
-  (`LectureNombre`, illisible plutôt que faux). Seuils à régler sur de vraies images filmées. Verdict de l'onglet
-  Objets (`TriInventaire`) : d'une pile que les objectifs demandent encore, garder ce qui manque et vendre le
-  reste ; nombre illisible ou build : tout garder. Cumul pendant qu'on fait défiler (`SuiviInventaire` : un objet
-  compte après deux images, son nombre est le plus souvent lu). Rien n'est enregistré ni envoyé : les images sont
-  analysées puis oubliées, la liste s'efface à la fermeture (pas de réserve).
+  puis par build). Reconnaissance sur le téléphone, jamais en ligne, réglée sur une vraie vidéo de la Réserve :
+  chaque case trouvée par son cadre (`DetectionGrille` : carré dont les quatre côtés suivent un bord, à deux pixels
+  près, même filmé un peu de biais ; seules restent les cases en grille, ni les boutons ni un bloc de quatre cases),
+  rareté lue sur le halo du coin en bas à gauche (`HaloRarete`), icône comparée aux icônes officielles de cette
+  rareté (`Reconnaisseur` : l'icône en haut de la case, posée sur un fond en pente douce, ajustée canal par canal
+  aux moindres carrés ; « sûr » seulement au-dessus d'un seuil et nettement devant la suivante, sauf variante du
+  même objet, `Reconnaisseur.famille` : niveaux d'une arme, variantes d'un module ; sinon « Pas sûr », jamais
+  compté à vendre), bande du bas lue (`LectureNombre` : « ×N » ou niveau en chiffres romains, qui choisit l'arme,
+  illisible plutôt que faux ; modèles de chiffres en Barlow). Un objet qui ne s'empile pas compte pour un
+  (`Objet.pile`, et un nombre plus grand qu'une pile pleine est faux). Les images floues du défilement restent
+  « Pas sûr ». Verdict de l'onglet Objets (`TriInventaire`) : d'une pile que les objectifs demandent encore, garder
+  ce qui manque et vendre le reste ; nombre illisible ou build : tout garder. Cumul pendant qu'on fait défiler
+  (`SuiviInventaire` : un objet compte après deux images ; son nombre, ses piles visibles additionnées, est le plus
+  grand lu sur au moins deux images). Rien n'est enregistré ni envoyé : les images sont analysées puis oubliées,
+  la liste s'efface à la fermeture (pas de réserve).
 - Retour de raid (`core/RetourDeRaid.kt`, `ui/EcranRetourRaid.kt`), le seul endroit où le joueur note
   des objets : seulement ce qui manque, sans pouvoir dépasser. `Planificateur.repartir` donne le butin
   aux objectifs qui le demandent (objectifs du jeu, puis butin recherché), le plus près d'être terminé

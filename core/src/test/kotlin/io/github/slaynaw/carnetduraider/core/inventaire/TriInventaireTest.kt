@@ -115,14 +115,14 @@ class TriInventaireTest {
     }
 
     @Test
-    fun `suivi - un objet compte apres deux images, avec le nombre lu le plus souvent`() {
+    fun `suivi - un objet compte apres deux images, avec le plus grand nombre lu deux fois`() {
         val suivi = SuiviInventaire(tri)
         suivi.observer(listOf(objet("bronze_statuette", 1), objet("apricot", 3)))
         assertTrue(suivi.bilan().aVendre.isEmpty(), "une seule image : rien n'est encore sûr")
         suivi.observer(listOf(objet("apricot", 3), CaseVue(Zone(0, 0, 1, 1), ContenuCase.PasSur)))
         suivi.observer(listOf(objet("apricot", 4)))
         val bilan = suivi.bilan()
-        // La statuette n'a été vue qu'une fois ; l'abricot trois fois, lu « 3 » deux fois sur trois.
+        // La statuette n'a été vue qu'une fois ; l'abricot trois fois, lu « 3 » deux fois, « 4 » une seule.
         assertEquals(listOf("apricot"), bilan.aVendre.map { it.objetId })
         assertEquals(3, bilan.aVendre.single().quantite)
         assertEquals(1, bilan.pasSur)
@@ -131,10 +131,21 @@ class TriInventaireTest {
     }
 
     @Test
-    fun `suivi - a egalite, le plus petit nombre lu l'emporte`() {
+    fun `suivi - aucun nombre lu deux fois - le plus petit l'emporte`() {
         val suivi = SuiviInventaire(tri)
         suivi.observer(listOf(objet("mechanical_components", manque + 4)))
         suivi.observer(listOf(objet("mechanical_components", manque + 2)))
         assertEquals(2, suivi.bilan().aVendre.single().quantite)
+    }
+
+    @Test
+    fun `suivi - les piles d'un objet comptent toutes une fois a l'ecran ensemble`() {
+        // Trois piles de 24 : on n'en voit d'abord que deux, puis les trois (deux images), puis une seule.
+        val suivi = SuiviInventaire(tri)
+        suivi.observer(listOf(objet("apricot", 24), objet("apricot", 24)))
+        suivi.observer(listOf(objet("apricot", 24), objet("apricot", 24), objet("apricot", 24)))
+        suivi.observer(listOf(objet("apricot", 24), objet("apricot", 24), objet("apricot", 24)))
+        suivi.observer(listOf(objet("apricot", 24)))
+        assertEquals(72, suivi.bilan().aVendre.single().quantite)
     }
 }

@@ -151,8 +151,10 @@ class TriInventaire(private val catalogue: Catalogue, private val verdict: (Stri
 /**
  * Ce que la caméra a vu depuis qu'elle est ouverte, image après image, le temps de faire défiler l'inventaire.
  * Un objet ne compte qu'après avoir été reconnu sur [imagesPourConfirmer] images (une erreur d'une image ne
- * s'ajoute pas). Son nombre est celui lu le plus souvent (le plus petit, à égalité) : jamais plus que ce qu'on
- * a vraiment vu ensemble. Tout s'efface avec [vider] : rien n'est gardé une fois la caméra fermée.
+ * s'ajoute pas). Son nombre, sur une image, est la somme de ses piles visibles ; en tout, c'est le plus grand
+ * nombre lu sur au moins deux images (toutes ses piles finissent par être à l'écran ensemble, et une erreur de
+ * lecture d'une image ne compte pas), sinon le plus petit lu : jamais plus que ce qu'on a vraiment vu ensemble.
+ * Tout s'efface avec [vider] : rien n'est gardé une fois la caméra fermée.
  */
 class SuiviInventaire(private val tri: TriInventaire, private val imagesPourConfirmer: Int = 2) {
 
@@ -183,7 +185,7 @@ class SuiviInventaire(private val tri: TriInventaire, private val imagesPourConf
     /** Ce qui est confirmé jusqu'ici. */
     fun bilan(): TriInventaire.Bilan {
         val objets = vus.values.filter { it.images >= imagesPourConfirmer }.associate { vu ->
-            vu.objetIds to vu.lectures.entries.maxWithOrNull(compareBy<Map.Entry<Int, Int>> { it.value }.thenByDescending { it.key })?.key
+            vu.objetIds to (vu.lectures.filterValues { it >= 2 }.keys.maxOrNull() ?: vu.lectures.keys.minOrNull())
         }
         return tri.bilan(objets, pasSur)
     }

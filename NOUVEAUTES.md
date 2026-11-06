@@ -5,6 +5,12 @@ Chaque section « ## X.Y.Z » est affichée dans l'application au moment de prop
 avant de publier une version (docs/MISES-A-JOUR.md). Les noms du jeu cités ici suivent la même règle
 que l'application : uniquement les traductions françaises officielles d'Embark Studios.
 
+## 0.15.1
+
+- **Filmer mon inventaire reconnaît enfin tes objets** : la reconnaissance a été refaite sur une vraie vidéo de la Réserve filmée au téléphone. Chaque case est trouvée par son cadre, même filmée un peu de biais ; la rareté se lit à la couleur du halo de la case ; dans la bande du bas, la quantité « ×24 » et le niveau des armes (I, II, III, IV) sont lus.
+- **Plus juste** : un objet qui ne s'empile pas compte toujours pour un, et un nombre douteux est laissé de côté plutôt que lu de travers. Les piles d'un même objet s'additionnent quand elles passent ensemble à l'écran.
+- **Conseil** : marque une courte pause après chaque défilement, le temps que les étiquettes se posent ; une image floue est simplement ignorée.
+
 ## 0.15.0
 
 - **Filmer mon inventaire** : dans l'onglet Objets, la pastille « Filmer mon inventaire » ouvre la caméra. Vise l'inventaire à l'écran du jeu : une étiquette se pose sur chaque case (VENDS, GARDE, BUILD, ou « ? » quand ce n'est pas sûr), et la liste de ce qui se vend sans souci se remplit pendant que tu fais défiler, avec son total en pièces. D'une pile que tes objectifs demandent encore, l'appli garde ce qui manque et te dit combien en vendre. « Terminé » montre la liste complète.
