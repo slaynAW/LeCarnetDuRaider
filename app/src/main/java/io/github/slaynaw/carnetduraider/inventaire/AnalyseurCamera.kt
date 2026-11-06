@@ -8,12 +8,16 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import io.github.slaynaw.carnetduraider.core.inventaire.AnalyseInventaire
 import io.github.slaynaw.carnetduraider.core.inventaire.CaseVue
+import io.github.slaynaw.carnetduraider.core.inventaire.Zone
 import java.util.concurrent.Executor
 import kotlin.math.max
 import kotlin.math.min
 
-/** Une image analysée : ses cases, et leur rectangle dans l'aperçu de la caméra à l'écran (en pixels). */
-class ImageAnalysee(val cases: List<CaseVue>, val rectangles: List<RectF>)
+/**
+ * Une image analysée : ses cases d'objet et leur rectangle dans l'aperçu de la caméra à l'écran (en pixels), le
+ * rectangle de chaque case trouvée ([cadres], reconnue ou non), et le temps qu'a pris l'analyse.
+ */
+class ImageAnalysee(val cases: List<CaseVue>, val rectangles: List<RectF>, val cadres: List<RectF>, val dureeMs: Long)
 
 /**
  * L'analyse des images de la caméra, en arrière-plan : quelques images par seconde au plus, chacune redressée
@@ -54,6 +58,7 @@ class AnalyseurCamera(
     }
 
     private fun analyser(image: ImageProxy, versVue: Matrix): ImageAnalysee {
+        val debut = SystemClock.elapsedRealtime()
         val tampon = image.toBitmap()
         val rotation = image.imageInfo.rotationDegrees
         // Redressée (tournée comme l'écran), puis réduite à LARGEUR_MAX pixels au plus sur son grand côté.
@@ -61,7 +66,7 @@ class AnalyseurCamera(
         val echelle = min(1f, LARGEUR_MAX.toFloat() / grandCote)
         val tamponVersAnalyse = rotation(rotation, tampon.width, tampon.height).apply { postScale(echelle, echelle) }
         val droite = Bitmap.createBitmap(tampon, 0, 0, tampon.width, tampon.height, tamponVersAnalyse, true)
-        val cases = analyse.analyser(PreparationReconnaissance.versImage(droite))
+        val vu = analyse.analyserImage(PreparationReconnaissance.versImage(droite))
         if (droite !== tampon) droite.recycle()
         tampon.recycle()
 
@@ -72,10 +77,8 @@ class AnalyseurCamera(
         image.imageInfo.sensorToBufferTransformMatrix.invert(tamponVersCapteur)
         versEcran.postConcat(tamponVersCapteur)
         versEcran.postConcat(versVue)
-        val rectangles = cases.map { c ->
-            RectF(c.zone.x.toFloat(), c.zone.y.toFloat(), c.zone.droite.toFloat(), c.zone.bas.toFloat()).also { versEcran.mapRect(it) }
-        }
-        return ImageAnalysee(cases, rectangles)
+        fun aLEcran(z: Zone) = RectF(z.x.toFloat(), z.y.toFloat(), z.droite.toFloat(), z.bas.toFloat()).also { versEcran.mapRect(it) }
+        return ImageAnalysee(vu.cases, vu.cases.map { aLEcran(it.zone) }, vu.cadres.map(::aLEcran), SystemClock.elapsedRealtime() - debut)
     }
 
     /** La rotation qui redresse un tampon de [l] × [h] pixels de [degres] (sens des aiguilles), sans sortir du cadre. */

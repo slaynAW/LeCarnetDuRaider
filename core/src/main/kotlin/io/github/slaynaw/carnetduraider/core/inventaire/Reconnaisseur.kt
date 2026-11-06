@@ -2,6 +2,7 @@ package io.github.slaynaw.carnetduraider.core.inventaire
 
 import io.github.slaynaw.carnetduraider.core.Rarete
 import kotlin.math.abs
+import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
@@ -38,7 +39,7 @@ class Reconnaisseur(icones: Map<String, ImageRgb>, raretes: Map<String, Rarete?>
      * Une icône réduite à [t] × [t] : son opacité, ses couleurs prémultipliées, et, canal par canal, ce qui ne
      * dépend que d'elle dans l'ajustement (les produits de ses cinq colonnes et leur inverse).
      */
-    private class Signature(val t: Int, icone: ImageRgb) {
+    private class Signature(val t: Int, icone: ImageRgb, flou: Int = 0) {
         val alpha: FloatArray
         val alphaX: FloatArray
         val alphaY: FloatArray
@@ -50,16 +51,23 @@ class Reconnaisseur(icones: Map<String, ImageRgb>, raretes: Map<String, Rarete?>
         init {
             val r = icone.echantillon(icone.zone, t, t)
             val n = t * t
-            alpha = FloatArray(n) { (r.pixels[it] ushr 24) / 255f }
+            // L'opacité et les couleurs prémultipliées, adoucies [flou] fois (comme une caméra un peu floue).
+            var a = FloatArray(n) { (r.pixels[it] ushr 24) / 255f }
+            var c = Array(3) { k -> FloatArray(n) { a[it] * canal(r.pixels[it], k) } }
+            repeat(flou) {
+                a = adoucir(a, t)
+                c = Array(3) { k -> adoucir(c[k], t) }
+            }
+            alpha = a
+            couleurs = c
             alphaX = FloatArray(n) { (alpha[it] * x(it, t)).toFloat() }
             alphaY = FloatArray(n) { (alpha[it] * y(it, t)).toFloat() }
-            couleurs = Array(3) { c -> FloatArray(n) { alpha[it] * canal(r.pixels[it], c) } }
             opacite = alpha.sumOf { it.toDouble() }
             gram = Array(3) { DoubleArray(25) }
-            inverse = Array(3) { c ->
-                val g = gram[c]
-                for (k in 0 until n) {
-                    val colonnes = colonnes(k, c)
+            inverse = Array(3) { k ->
+                val g = gram[k]
+                for (m in 0 until n) {
+                    val colonnes = colonnes(m, k)
                     for (i in 0 until 5) for (j in 0 until 5) g[i * 5 + j] += colonnes[i] * colonnes[j]
                 }
                 val trace = (0 until 5).sumOf { g[it * 5 + it] }
@@ -96,7 +104,8 @@ class Reconnaisseur(icones: Map<String, ImageRgb>, raretes: Map<String, Rarete?>
         }
     }
 
-    private class Reference(val objetIds: List<String>, val raretes: Set<Rarete?>, val petite: Signature, val grande: Signature)
+    /** Une icône de référence : en petit, en grand, et en grand adoucie (pour une case filmée un peu floue). */
+    private class Reference(val objetIds: List<String>, val raretes: Set<Rarete?>, val petite: Signature, val grande: Signature, val floue: Signature)
 
     /** Clé d'égalité exacte des pixels d'une icône réduite : deux objets à la même icône ne font qu'une référence. */
     private class Cle(val pixels: IntArray) {
@@ -110,7 +119,7 @@ class Reconnaisseur(icones: Map<String, ImageRgb>, raretes: Map<String, Rarete?>
             val icone = icones.getValue(ids.first())
             val grande = Signature(GRANDE, icone)
             if (grande.opacite < GRANDE * GRANDE * PART_OPAQUE_MIN) return@mapNotNull null
-            Reference(ids.sorted(), ids.map { raretes[it] }.toSet(), Signature(PETITE, icone), grande)
+            Reference(ids.sorted(), ids.map { raretes[it] }.toSet(), Signature(PETITE, icone), grande, Signature(GRANDE, icone, FLOU))
         }
 
     /** Nombre d'icônes différentes connues (les objets qui partagent une icône n'en font qu'une). */
@@ -153,13 +162,14 @@ class Reconnaisseur(icones: Map<String, ImageRgb>, raretes: Map<String, Rarete?>
             image.echantillon(Zone((icone.x + dx * pas).roundToInt(), (icone.y + dy * pas).roundToInt(), icone.largeur, icone.hauteur), GRANDE, GRANDE),
         )
         val centre = cadre(0, 0)
-        val meilleurs = DoubleArray(premieres.size) { ressemblance(references[premieres[it]].grande, centre) }
+        fun score(reference: Reference, e: Echantillon) = max(ressemblance(reference.grande, e), ressemblance(reference.floue, e))
+        val meilleurs = DoubleArray(premieres.size) { score(references[premieres[it]], centre) }
         val proches = premieres.indices.sortedByDescending { meilleurs[it] }.take(DECALEES)
         for (dy in -1..1) for (dx in -1..1) {
             if (dx == 0 && dy == 0) continue
             val decale = cadre(dx, dy)
             for (rang in proches) {
-                val s = ressemblance(references[premieres[rang]].grande, decale)
+                val s = score(references[premieres[rang]], decale)
                 if (s > meilleurs[rang]) meilleurs[rang] = s
             }
         }
@@ -215,6 +225,9 @@ class Reconnaisseur(icones: Map<String, ImageRgb>, raretes: Map<String, Rarete?>
         /** Icônes gardées après la comparaison en petit. */
         private const val CANDIDATES = 10
 
+        /** Passes d'adoucissement de l'icône floue (un filtre 1-2-1 chacune, environ un pixel de flou en grand). */
+        private const val FLOU = 2
+
         /** Icônes essayées aussi avec de petits décalages. */
         private const val DECALEES = 4
 
@@ -254,6 +267,23 @@ class Reconnaisseur(icones: Map<String, ImageRgb>, raretes: Map<String, Rarete?>
                 cote.roundToInt().coerceAtLeast(1),
                 (zone.hauteur * ICONE).roundToInt().coerceAtLeast(1),
             )
+        }
+
+        /** [v] (t × t) adouci d'un filtre 1-2-1 en largeur puis en hauteur, bords répétés. */
+        private fun adoucir(v: FloatArray, t: Int): FloatArray {
+            val h = FloatArray(v.size)
+            for (j in 0 until t) for (i in 0 until t) {
+                val g = v[j * t + maxOf(0, i - 1)]
+                val d = v[j * t + minOf(t - 1, i + 1)]
+                h[j * t + i] = (g + 2 * v[j * t + i] + d) / 4
+            }
+            val sortie = FloatArray(v.size)
+            for (j in 0 until t) for (i in 0 until t) {
+                val haut = h[maxOf(0, j - 1) * t + i]
+                val bas = h[minOf(t - 1, j + 1) * t + i]
+                sortie[j * t + i] = (haut + 2 * h[j * t + i] + bas) / 4
+            }
+            return sortie
         }
 
         private fun x(k: Int, t: Int): Double = (k % t + 0.5) / t

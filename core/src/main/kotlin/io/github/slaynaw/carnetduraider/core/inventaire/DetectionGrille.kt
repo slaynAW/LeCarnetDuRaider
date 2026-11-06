@@ -20,8 +20,11 @@ data class CaseGrille(val ligne: Int, val colonne: Int, val zone: Zone)
  * une case à moitié cachée par le bord de la liste aussi (elle n'a pas ses quatre côtés).
  */
 object DetectionGrille {
-    /** La recherche se fait sur une copie dont le grand côté fait au plus ce nombre de pixels. */
-    private const val COTE_TRAVAIL = 800
+    /**
+     * La recherche se fait sur une copie dont le grand côté fait au plus ce nombre de pixels : la première, puis la
+     * suivante si presque rien n'est trouvé (une image floue y redevient nette).
+     */
+    private val COTES_TRAVAIL = intArrayOf(800, 480)
 
     /** Écart de luminance (entre les deux voisins d'un pixel) à partir duquel il y a un bord. */
     private const val SEUIL_BORD = 18
@@ -56,7 +59,20 @@ object DetectionGrille {
      * l'image précédente (en pixels de [image]), pour chercher plus vite autour d'elle.
      */
     fun detecter(image: ImageRgb, tailleAttendue: Int? = null): List<CaseGrille> {
-        val facteur = min(1.0, COTE_TRAVAIL.toDouble() / max(image.largeur, image.hauteur))
+        var meilleure = emptyList<CaseGrille>()
+        // D'abord assez grand pour les cases filmées de loin ; si presque rien n'y est trouvé, plus petit : une
+        // image floue (mise au point, main qui bouge) y redevient nette, ses cadres aussi.
+        for (cote in COTES_TRAVAIL) {
+            val cases = detecterA(image, cote, tailleAttendue)
+            if (cases.size > meilleure.size) meilleure = cases
+            if (meilleure.size >= CASES_SUIVIES) break
+        }
+        return meilleure
+    }
+
+    /** Les cases de [image], cherchées sur une copie dont le grand côté fait au plus [coteTravail] pixels. */
+    private fun detecterA(image: ImageRgb, coteTravail: Int, tailleAttendue: Int?): List<CaseGrille> {
+        val facteur = min(1.0, coteTravail.toDouble() / max(image.largeur, image.hauteur))
         val travail = reduite(image, facteur)
         val bords = Bords(travail)
         val cote = min(travail.largeur, travail.hauteur) / 2.0

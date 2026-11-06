@@ -127,6 +127,17 @@ class ReconnaissanceTest {
     }
 
     @Test
+    fun `toutes les cases trouvees sont rendues avec leur cadre, meme vides`() {
+        val ecran = ImagesDeTest.ecran(inventaire)
+        val vu = analyse().analyserImage(ecran.image)
+        assertEquals(24, vu.cadres.size)
+        // La case vide a un cadre, mais pas de contenu.
+        val vide = ecran.zones[ecran.cases.indexOfFirst { it.graine == null }]
+        assertTrue(vu.cadres.any { proches(it, vide) })
+        assertTrue(vu.cases.none { proches(it.zone, vide) })
+    }
+
+    @Test
     fun `une icone inconnue n'est jamais reconnue comme un objet`() {
         val inconnue = ImagesDeTest.icone(1234)
         val cases = listOf(CaseTest(1234), case(3), case(7), case(11))

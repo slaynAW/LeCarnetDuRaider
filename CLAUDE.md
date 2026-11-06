@@ -160,12 +160,16 @@ guillemets `« … »`. Apostrophe droite `'` acceptée dans le code.
   Objets (`BoutonFilmerInventaire`) ; caméra en direct (CameraX, autorisation Caméra demandée à la première
   ouverture), une étiquette sur chaque case reconnue (VENDS, VENDS n, RECYCLE, GARDE, BUILD, « ? »), et dessous la
   liste « À vendre » qui se remplit avec son total ; « Terminé » ouvre la liste complète (à garder par objectif
-  puis par build). Reconnaissance sur le téléphone, jamais en ligne, réglée sur une vraie vidéo de la Réserve :
-  chaque case trouvée par son cadre (`DetectionGrille` : carré dont les quatre côtés suivent un bord, à deux pixels
-  près, même filmé un peu de biais ; seules restent les cases en grille, ni les boutons ni un bloc de quatre cases),
+  puis par build) ; sur l'aperçu, un fin cadre sur chaque case vue (même non reconnue) et un compteur « N cases
+  vues · M reconnues · durée de l'analyse ». Reconnaissance sur le téléphone, jamais en ligne, réglée sur une vraie
+  vidéo de la Réserve (`AnalyseInventaire.analyserImage`) : chaque case trouvée par son cadre (`DetectionGrille` :
+  carré dont les quatre côtés suivent un bord, à deux pixels près, même filmé un peu de biais ; cherché à deux
+  tailles d'image, une image floue redevenant nette en plus petit ; seules restent les cases en grille, ni les
+  boutons ni un bloc de quatre cases),
   rareté lue sur le halo du coin en bas à gauche (`HaloRarete`), icône comparée aux icônes officielles de cette
   rareté (`Reconnaisseur` : l'icône en haut de la case, posée sur un fond en pente douce, ajustée canal par canal
-  aux moindres carrés ; « sûr » seulement au-dessus d'un seuil et nettement devant la suivante, sauf variante du
+  aux moindres carrés, nette ou adoucie pour une case un peu floue ; un reflet, tache presque blanche sur l'icône,
+  rend la case « Pas sûr » ; « sûr » seulement au-dessus d'un seuil et nettement devant la suivante, sauf variante du
   même objet, `Reconnaisseur.famille` : niveaux d'une arme, variantes d'un module ; sinon « Pas sûr », jamais
   compté à vendre), bande du bas lue (`LectureNombre` : « ×N » ou niveau en chiffres romains, qui choisit l'arme,
   illisible plutôt que faux ; modèles de chiffres en Barlow). Un objet qui ne s'empile pas compte pour un

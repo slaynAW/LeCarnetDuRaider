@@ -96,17 +96,22 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.github.slaynaw.carnetduraider.CarnetViewModel
 import io.github.slaynaw.carnetduraider.core.inventaire.AnalyseInventaire
+import io.github.slaynaw.carnetduraider.core.inventaire.ContenuCase
 import io.github.slaynaw.carnetduraider.core.inventaire.EtiquetteCase
 import io.github.slaynaw.carnetduraider.core.inventaire.TriInventaire
 import io.github.slaynaw.carnetduraider.inventaire.AnalyseurCamera
 import io.github.slaynaw.carnetduraider.inventaire.PreparationReconnaissance
 import io.github.slaynaw.carnetduraider.ui.theme.Prompt
 import io.github.slaynaw.carnetduraider.ui.theme.Signal
+import java.util.Locale
 import java.util.concurrent.Executors
 import androidx.compose.ui.geometry.Size as TailleCompose
 
 /** Une étiquette posée sur l'aperçu de la caméra : le rectangle de la case à l'écran, et ce qu'elle dit. */
 private class EtiquetteVue(val rectangle: RectF, val etiquette: EtiquetteCase, val nombre: Int?)
+
+/** Ce que la dernière image analysée a donné : cases vues (par leur cadre), objets reconnus, temps d'analyse. */
+private class CompteImage(val vues: Int, val reconnues: Int, val dureeMs: Long)
 
 /**
  * Filmer mon inventaire : la caméra en direct sur l'écran du jeu, une étiquette sur chaque case reconnue (VENDS,
@@ -169,7 +174,10 @@ private fun CameraEtListe(
         value = PreparationReconnaissance.obtenir(contexte, vm.catalogue.tous)
     }
     var etiquettes by remember { mutableStateOf(emptyList<EtiquetteVue>()) }
+    var cadres by remember { mutableStateOf(emptyList<RectF>()) }
+    var compte by remember { mutableStateOf<CompteImage?>(null) }
     var imagesSansGrille by remember { mutableIntStateOf(0) }
+    var imagesSansObjet by remember { mutableIntStateOf(0) }
     val controleur = remember {
         LifecycleCameraController(contexte).apply {
             setEnabledUseCases(CameraController.IMAGE_ANALYSIS)
@@ -202,7 +210,11 @@ private fun CameraEtListe(
                 vm.suiviInventaire.observer(image.cases)
                 changerBilan(vm.suiviInventaire.bilan())
                 etiquettes = vm.triInventaire.etiqueter(image.cases).zip(image.rectangles) { e, r -> EtiquetteVue(r, e.etiquette, e.nombre) }
-                imagesSansGrille = if (image.cases.isEmpty()) imagesSansGrille + 1 else 0
+                cadres = image.cadres
+                val reconnues = image.cases.count { it.contenu is ContenuCase.Objet }
+                compte = CompteImage(image.cadres.size, reconnues, image.dureeMs)
+                imagesSansGrille = if (image.cadres.isEmpty()) imagesSansGrille + 1 else 0
+                imagesSansObjet = if (image.cadres.isNotEmpty() && reconnues == 0) imagesSansObjet + 1 else 0
             },
         )
         onDispose {
@@ -222,7 +234,7 @@ private fun CameraEtListe(
                 },
                 modifier = Modifier.fillMaxSize(),
             )
-            CalqueEtiquettes(etiquettes, Modifier.fillMaxSize())
+            CalqueEtiquettes(etiquettes, cadres, Modifier.fillMaxSize())
             Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).padding(12.dp)) {
                 Surface(
                     onClick = onFermer,
@@ -238,6 +250,7 @@ private fun CameraEtListe(
                     val indication = when {
                         pret == null -> "Préparation de la reconnaissance…"
                         imagesSansGrille >= 8 -> "Mets toute la grille dans l'image, téléphone bien en face de l'écran"
+                        imagesSansObjet >= 6 -> "Je vois les cases, pas les objets : touche l'image pour faire la mise au point, et tiens le téléphone immobile un instant"
                         else -> "Fais défiler ton inventaire : j'ajoute ce que je vois"
                     }
                     Text(
@@ -250,6 +263,16 @@ private fun CameraEtListe(
                             .background(Signal.Fond.copy(alpha = 0.55f), RoundedCornerShape(50))
                             .padding(horizontal = 12.dp, vertical = 6.dp),
                     )
+                    compte?.let { c ->
+                        Text(
+                            "${c.vues} case${if (c.vues > 1) "s" else ""} vue${if (c.vues > 1) "s" else ""} · ${c.reconnues} reconnue${if (c.reconnues > 1) "s" else ""} · ${"%.1f".format(Locale.FRANCE, c.dureeMs / 1000.0)}\u00a0s",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Signal.TexteDoux,
+                            modifier = Modifier
+                                .background(Signal.Fond.copy(alpha = 0.55f), RoundedCornerShape(50))
+                                .padding(horizontal = 10.dp, vertical = 3.dp),
+                        )
+                    }
                 }
             }
         }
@@ -280,12 +303,19 @@ private fun PuceDirect() {
     }
 }
 
-/** Les étiquettes des cases, posées sur l'aperçu : un cadre doré autour de ce qui se vend, un mot sous chaque case. */
+/**
+ * Les étiquettes des cases, posées sur l'aperçu : un fin cadre clair sur chaque case trouvée (reconnue ou non : le
+ * joueur voit que la grille est vue), un cadre doré autour de ce qui se vend, un mot sous chaque case reconnue.
+ */
 @Composable
-private fun CalqueEtiquettes(etiquettes: List<EtiquetteVue>, modifier: Modifier) {
+private fun CalqueEtiquettes(etiquettes: List<EtiquetteVue>, cadres: List<RectF>, modifier: Modifier) {
     val mesure = rememberTextMeasurer()
     val style = TextStyle(fontFamily = Prompt, fontWeight = FontWeight.Bold, fontSize = 9.sp, letterSpacing = 0.6.sp)
     Canvas(modifier) {
+        val fin = 1.dp.toPx()
+        for (r in cadres) {
+            drawRoundRect(Color.White.copy(alpha = 0.35f), Offset(r.left, r.top), TailleCompose(r.width(), r.height()), CornerRadius(4.dp.toPx()), style = Stroke(fin))
+        }
         val trait = 1.5.dp.toPx()
         for (e in etiquettes) {
             val (texte, couleur) = libelle(e)
