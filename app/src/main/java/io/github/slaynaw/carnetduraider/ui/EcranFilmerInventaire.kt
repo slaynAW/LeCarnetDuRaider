@@ -52,11 +52,13 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -143,18 +145,22 @@ fun EcranFilmerInventaire(vm: CarnetViewModel, onFermer: () -> Unit) {
     // Retour : de la liste complète à la caméra, puis on ferme.
     BackHandler { if (liste) liste = false else onFermer() }
 
+    // Cet écran s'ouvre par-dessus l'appli, hors de sa structure : la couleur du texte (claire) lui est donnée ici,
+    // sans quoi tout texte sans couleur propre serait noir sur le fond sombre.
     Box(Modifier.fillMaxSize().background(Color.Black)) {
-        when {
-            liste -> EcranInventaireFilme(vm, bilan, onFermer = onFermer)
-            autorisee -> CameraEtListe(vm, bilan, changerBilan = { bilan = it }, terminer = { liste = true }, onFermer = onFermer)
-            else -> DemandeCamera(
-                refusee,
-                autoriser = { demande.launch(Manifest.permission.CAMERA) },
-                ouvrirReglages = {
-                    contexte.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", contexte.packageName, null)))
-                },
-                onFermer = onFermer,
-            )
+        CompositionLocalProvider(LocalContentColor provides Signal.Texte) {
+            when {
+                liste -> EcranInventaireFilme(vm, bilan, onFermer = onFermer)
+                autorisee -> CameraEtListe(vm, bilan, changerBilan = { bilan = it }, terminer = { liste = true }, onFermer = onFermer)
+                else -> DemandeCamera(
+                    refusee,
+                    autoriser = { demande.launch(Manifest.permission.CAMERA) },
+                    ouvrirReglages = {
+                        contexte.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", contexte.packageName, null)))
+                    },
+                    onFermer = onFermer,
+                )
+            }
         }
     }
 }
@@ -346,7 +352,7 @@ private fun libelle(e: EtiquetteVue): Pair<String, Color> = when (e.etiquette) {
 /** La feuille sous la caméra : ce qui est à vendre jusqu'ici, avec le total, puis ce qui se garde et ce qui n'est pas sûr. */
 @Composable
 private fun FeuilleAVendre(vm: CarnetViewModel, bilan: TriInventaire.Bilan, preparation: Boolean, terminer: () -> Unit, modifier: Modifier) {
-    Surface(color = Signal.Surface, shape = RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp), modifier = modifier) {
+    Surface(color = Signal.Surface, contentColor = Signal.Texte, shape = RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp), modifier = modifier) {
         Column(Modifier.fillMaxSize().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, top = 8.dp)) {
             Box(Modifier.align(Alignment.CenterHorizontally).width(36.dp).height(4.dp).background(Signal.Trait, RoundedCornerShape(2.dp)))
             Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -427,7 +433,7 @@ fun LigneVenteFilmee(vm: CarnetViewModel, ligne: TriInventaire.LigneVente, modif
     ) {
         IconeObjet(ligne.objetId, vm.catalogue.objet(ligne.objetId)?.rarete, 34.dp)
         Column(Modifier.weight(1f)) {
-            Text(ligne.nom, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(ligne.nom, style = MaterialTheme.typography.titleSmall, color = Signal.Texte, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (detail != null) Text(detail, style = MaterialTheme.typography.bodySmall, color = Signal.TexteDoux, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Text(milliers(ligne.total), style = TextStyle(fontFamily = Prompt, fontWeight = FontWeight.Bold, fontSize = 14.sp), color = Signal.Or)
@@ -442,7 +448,7 @@ private fun DemandeCamera(refusee: Boolean, autoriser: () -> Unit, ouvrirReglage
         verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
     ) {
         Icon(IconeCamera, contentDescription = null, tint = Signal.Or, modifier = Modifier.size(44.dp))
-        Text("Filmer ton inventaire", style = MaterialTheme.typography.headlineSmall)
+        Text("Filmer ton inventaire", style = MaterialTheme.typography.headlineSmall, color = Signal.Texte)
         Text(
             "Pour reconnaître tes objets, l'appli a besoin de la caméra. Les images sont analysées sur le téléphone puis oubliées : rien n'est enregistré ni envoyé.",
             style = MaterialTheme.typography.bodyMedium,

@@ -45,8 +45,8 @@ fun EcranInventaireFilme(vm: CarnetViewModel, bilan: TriInventaire.Bilan, onFerm
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = PLACE_BOUTON_FIXE)) {
             item {
                 Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onFermer) { Icon(Icons.Filled.Close, contentDescription = "Fermer") }
-                    Text("Ce que tu peux vendre", style = MaterialTheme.typography.titleLarge)
+                    IconButton(onClick = onFermer) { Icon(Icons.Filled.Close, contentDescription = "Fermer", tint = Signal.Texte) }
+                    Text("Ce que tu peux vendre", style = MaterialTheme.typography.titleLarge, color = Signal.Texte)
                 }
             }
             item {
@@ -102,7 +102,7 @@ private fun GroupeAGarder(vm: CarnetViewModel, groupe: TriInventaire.GroupeGarde
         groupe.objets.forEach { (id, quantite) ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 IconeObjet(id, vm.catalogue.objet(id)?.rarete, 28.dp)
-                Text(vm.catalogue.nomObjet(id), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Text(vm.catalogue.nomObjet(id), style = MaterialTheme.typography.bodyMedium, color = Signal.Texte, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 Text(quantite?.let { "×$it" } ?: "tout", style = MaterialTheme.typography.bodySmall, color = Signal.TexteDoux)
             }
         }
