@@ -5,6 +5,10 @@ Chaque section « ## X.Y.Z » est affichée dans l'application au moment de prop
 avant de publier une version (docs/MISES-A-JOUR.md). Les noms du jeu cités ici suivent la même règle
 que l'application : uniquement les traductions françaises officielles d'Embark Studios.
 
+## 0.15.3
+
+- **Filmer mon inventaire** : les noms des objets et le titre de la liste sont lisibles, sur la liste complète comme sous la caméra (ils s'affichaient en gris très sombre sur le fond noir).
+
 ## 0.15.2
 
 - **Filmer mon inventaire, en direct** : chaque case que la caméra voit est entourée d'un fin cadre, même tant que l'objet n'est pas reconnu, et un compteur dit combien de cases sont vues et combien sont reconnues. Tu sais tout de suite si ta Réserve est bien trouvée.
