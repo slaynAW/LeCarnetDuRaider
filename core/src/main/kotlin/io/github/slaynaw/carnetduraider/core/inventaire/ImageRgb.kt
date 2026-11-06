@@ -1,5 +1,6 @@
 package io.github.slaynaw.carnetduraider.core.inventaire
 
+import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
@@ -45,47 +46,70 @@ class ImageRgb(val largeur: Int, val hauteur: Int, val pixels: IntArray) {
      * filmé. Ce qui dépasse de l'image compte comme transparent.
      */
     fun echantillon(zone: Zone, l: Int, h: Int): ImageRgb {
+        // Ligne par ligne de sortie : chaque ligne d'entrée qu'elle recouvre est d'abord réduite en largeur, puis
+        // ajoutée au prorata de la hauteur couverte ; couleurs prémultipliées par l'opacité.
+        val colonnes = Couverture(zone.x, zone.largeur, l, largeur)
+        val lignes = Couverture(zone.y, zone.hauteur, h, hauteur)
+        val surface = colonnes.pas * lignes.pas
+        val sa = DoubleArray(l)
+        val sr = DoubleArray(l)
+        val sv = DoubleArray(l)
+        val sb = DoubleArray(l)
         val sortie = IntArray(l * h)
-        val pasX = zone.largeur.toDouble() / l
-        val pasY = zone.hauteur.toDouble() / h
         for (j in 0 until h) {
-            val y0 = zone.y + j * pasY
-            val y1 = y0 + pasY
-            for (i in 0 until l) {
-                val x0 = zone.x + i * pasX
-                val x1 = x0 + pasX
-                var surface = 0.0
-                var a = 0.0
-                var r = 0.0
-                var v = 0.0
-                var b = 0.0
-                var sy = floor(y0).toInt()
-                while (sy < y1) {
-                    val couvreY = min(y1, sy + 1.0) - max(y0, sy.toDouble())
-                    var sx = floor(x0).toInt()
-                    while (sx < x1) {
-                        val couvre = couvreY * (min(x1, sx + 1.0) - max(x0, sx.toDouble()))
-                        surface += couvre
-                        if (sx in 0 until largeur && sy in 0 until hauteur) {
-                            val p = pixels[sy * largeur + sx]
-                            val alpha = (p ushr 24) * couvre
-                            a += alpha
-                            r += ((p shr 16) and 0xFF) * alpha
-                            v += ((p shr 8) and 0xFF) * alpha
-                            b += (p and 0xFF) * alpha
-                        }
-                        sx++
+            sa.fill(0.0)
+            sr.fill(0.0)
+            sv.fill(0.0)
+            sb.fill(0.0)
+            val partsY = lignes.parts[j]
+            for (k in partsY.indices) {
+                val ligne = (lignes.premier[j] + k) * largeur
+                val py = partsY[k]
+                for (i in 0 until l) {
+                    val premier = colonnes.premier[i]
+                    val partsX = colonnes.parts[i]
+                    for (m in partsX.indices) {
+                        val p = pixels[ligne + premier + m]
+                        val poids = (p ushr 24) * partsX[m] * py
+                        sa[i] += poids
+                        sr[i] += ((p shr 16) and 0xFF) * poids
+                        sv[i] += ((p shr 8) and 0xFF) * poids
+                        sb[i] += (p and 0xFF) * poids
                     }
-                    sy++
                 }
-                sortie[j * l + i] = if (a <= 0.0) {
-                    0
-                } else {
-                    argb((a / surface).roundToInt(), (r / a).roundToInt(), (v / a).roundToInt(), (b / a).roundToInt())
-                }
+            }
+            for (i in 0 until l) {
+                val a = sa[i]
+                sortie[j * l + i] = if (a <= 0.0) 0 else argb((a / surface).roundToInt(), (sr[i] / a).roundToInt(), (sv[i] / a).roundToInt(), (sb[i] / a).roundToInt())
             }
         }
         return ImageRgb(l, h, sortie)
+    }
+
+    /**
+     * Le long d'un axe : pour chacun des [n] pixels de sortie qui couvrent [etendue] pixels à partir de [depart],
+     * le premier pixel d'entrée qu'il recouvre et la part recouverte de chacun (ceux hors de l'image, de 0 à
+     * [taille] − 1, ne comptent pas : ils sont transparents).
+     */
+    private class Couverture(depart: Int, etendue: Int, n: Int, taille: Int) {
+        val pas = etendue.toDouble() / n
+        val premier = IntArray(n)
+        val parts: Array<DoubleArray>
+
+        init {
+            parts = Array(n) { i ->
+                val debut = depart + i * pas
+                val fin = debut + pas
+                val p0 = max(0, floor(debut).toInt())
+                val p1 = min(taille - 1, ceil(fin).toInt() - 1)
+                premier[i] = p0
+                if (p1 < p0) {
+                    DoubleArray(0)
+                } else {
+                    DoubleArray(p1 - p0 + 1) { k -> min(fin, p0 + k + 1.0) - max(debut, (p0 + k).toDouble()) }
+                }
+            }
+        }
     }
 
     companion object {

@@ -166,7 +166,7 @@ private fun CameraEtListe(
     val cycle = LocalLifecycleOwner.current
     // La reconnaissance se prépare pendant que l'aperçu démarre (quelques secondes la première fois).
     val analyse by produceState<AnalyseInventaire?>(null) {
-        value = PreparationReconnaissance.obtenir(contexte, vm.catalogue.tous.map { it.id })
+        value = PreparationReconnaissance.obtenir(contexte, vm.catalogue.tous)
     }
     var etiquettes by remember { mutableStateOf(emptyList<EtiquetteVue>()) }
     var imagesSansGrille by remember { mutableIntStateOf(0) }
