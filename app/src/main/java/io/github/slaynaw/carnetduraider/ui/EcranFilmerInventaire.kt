@@ -383,8 +383,9 @@ private fun RangeeFeuille(titre: String, couleur: Color, detail: String, onClick
 /** Une ligne « À vendre » : l'icône, le nom, combien (et ce qu'on en garde), et ce que ça rapporte. */
 @Composable
 fun LigneVenteFilmee(vm: CarnetViewModel, ligne: TriInventaire.LigneVente, modifier: Modifier = Modifier) {
+    val sur = ligne.sur
     val detail = when {
-        ligne.sur != null -> "${ligne.quantite} sur ${ligne.sur} · garde ${ligne.sur - ligne.quantite}"
+        sur != null -> "${ligne.quantite} sur $sur · garde ${sur - ligne.quantite}"
         ligne.recycler -> if (ligne.quantite > 1) "À recycler · ×${ligne.quantite}" else "À recycler"
         ligne.quantite > 1 -> "×${ligne.quantite}"
         else -> null
